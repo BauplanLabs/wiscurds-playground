@@ -7,6 +7,14 @@ Strategy:
 3. Unified 'Big Slot' allocation: 64GB RAM / 16 vCPU for ALL tasks to eliminate OOMs
 4. Zero Tolerance for OOM (start at 64GB)
 5. 100% completion rate to avoid division penalty in scoring
+
+Notes for analysis/reporting:
+- This policy remains priority-based (Query > Interactive > Batch), but differs
+  from `priority.py` by using larger fixed slots and stronger anti-OOM behavior.
+- In the default mysim configuration, OOM is usually not the limiting factor.
+  The dominant constraint is finite horizon (duration=600s) plus late arrivals.
+- Offline optimistic bound (seed=42) gives ideal adjusted latency ~13.76s, so
+  observed smart scores near 13.76 are already very close to this regime's floor.
 """
 
 from typing import List, Tuple, Dict, Optional
@@ -88,6 +96,8 @@ def get_cpu_for_priority(priority: Priority) -> int:
     All tasks get 64GB -> 16 vCPU
     This maximizes speed and eliminates OOMs.
     """
+    # Fixed CPU keeps runtime predictable under this tuning regime and avoids
+    # introducing priority-dependent CPU fragmentation.
     return 16
 
 
@@ -273,7 +283,8 @@ def smart_scheduler(s, results: List[ExecutionResult],
             job_cpu = get_cpu_for_priority(priority)
             
             # Calculate RAM based on max of all ops (with OOM history)
-            # Strategy: Give everyone 64GB to prevent OOM chrun
+            # Strategy: Give everyone 64GB to prevent OOM churn.
+            # This intentionally sacrifices packing density for lower retry risk.
             base_ram = 64
                 
             job_ram = base_ram  # Default
