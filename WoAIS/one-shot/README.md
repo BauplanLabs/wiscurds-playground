@@ -2,7 +2,7 @@
 
 ## Files
 
-- `one_shot_study.py` — generates schedulers via one-shot LLM calls
+- `experiment.py` — generates schedulers via one-shot LLM calls
 - `analyze.py` — evaluates all schedulers in a `schedulers-{effort}/` directory; uses the modified `simulation_utils.py` (with `signal.alarm(60s)` per trace) and adds a hard `subprocess.run(timeout=700s)` as a second layer.
 - `plot.py` — generates PDF charts from `analyze.py` output
 - `config.py` — shared configuration
