@@ -1,5 +1,9 @@
 # One-Shot Scheduler Evaluation
 
+## Overview
+
+This one-shot experiment evaluates whether an LLM can produce effective schedulers from a single generation pass. For each reasoning effort level, we generate 50 candidate policies and evaluate them on the same trace set. The core evaluation metric is **latency** (median over traces per policy), and cross-effort comparisons focus on both **functional success rate** and **beat-baseline rate**.
+
 ## Files
 
 - `experiment.py` — generates schedulers via one-shot LLM calls
