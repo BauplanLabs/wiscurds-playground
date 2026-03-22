@@ -20,6 +20,8 @@ CANONICAL_SIM_PARAMS = {
     "query_prob": 0.1,
     "batch_prob": 0.6,
     "random_seed": 42,
+    "per_trace_timeout": None,   # no per-trace wall-clock limit
+    "subprocess_timeout": 600,   # 10-min safety net per scheduler
 }
 
 SUPPORTED_EFFORTS = ["none", "low", "medium", "high"]

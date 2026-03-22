@@ -113,14 +113,17 @@ def _evaluate_scheduler_worker(
                 reason = last_failure.get("reason", "unknown")
                 trace_file = last_failure.get("trace_file", "unknown")
                 detail = last_failure.get("detail", "")
-                if reason == "timeout":
-                    return {
-                        "functional": False, "failure_mode": "simulation_timeout",
-                        "error_message": f"Timeout on '{trace_file}' after {last_failure.get('timeout_seconds')}s ({len(raw)}/{len(trace_files)} traces)",
-                    }
+                # Map reason to specific failure_mode for clean analysis
+                reason_to_mode = {
+                    "timeout": "simulation_timeout",
+                    "tick_timeout": "tick_timeout",
+                    "no_completed_containers": "no_completed_containers",
+                }
+                failure_mode = reason_to_mode.get(reason, f"simulation_error_{reason}")
                 return {
-                    "functional": False, "failure_mode": "simulation_error",
-                    "error_message": f"Failed on '{trace_file}' ({reason}): {detail} ({len(raw)}/{len(trace_files)} traces)",
+                    "functional": False, "failure_mode": failure_mode,
+                    "reason": reason,
+                    "error_message": f"Failed on '{trace_file}': {detail} ({len(raw)}/{len(trace_files)} traces)",
                 }
             return {
                 "functional": False, "failure_mode": "simulation_error",
@@ -203,22 +206,32 @@ def evaluate(
         metric,
         json.dumps(base_params),
     ]
+    subprocess_timeout = base_params.get("subprocess_timeout", 700)  # None = disabled
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True,
             cwd=str(Path(__file__).resolve().parent.parent),
-            timeout=700,  # 60s/trace × 10 traces + 100s buffer
+            timeout=subprocess_timeout,
         )
         # Extract result via marker to avoid interference from stray stdout
         for line in reversed(result.stdout.strip().split("\n")):
             if line.startswith("__RESULT__"):
                 return json.loads(line[len("__RESULT__"):])
         stderr_snippet = result.stderr[-200:] if result.stderr else "no output"
-        return {"functional": False, "failure_mode": "no_output", "error_message": stderr_snippet}
+        return {"functional": False, "failure_mode": "no_output", "reason": "no_output", "error_message": stderr_snippet}
     except subprocess.TimeoutExpired:
-        return {"functional": False, "failure_mode": "total_timeout", "error_message": "Subprocess exceeded 700s total limit"}
+        return {"functional": False, "failure_mode": "total_timeout", "reason": "total_timeout", "error_message": f"Subprocess exceeded {subprocess_timeout}s total limit"}
     except Exception as e:
         return {"functional": False, "failure_mode": "eval_error", "error_message": str(e)}
+
+
+def load_experiment_config(experiment_name: str) -> dict:
+    """Load PARAM_OVERRIDES from experiments/{name}/config.py."""
+    config_path = ONE_SHOT_DIR / "experiments" / experiment_name / "config.py"
+    assert config_path.exists(), f"Experiment config not found: {config_path}"
+    ns = {}
+    exec(config_path.read_text(), ns)
+    return ns.get("PARAM_OVERRIDES", {})
 
 
 def main() -> None:
@@ -227,6 +240,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("scheduler_dir", type=Path)
     parser.add_argument("--metric", choices=["latency", "throughput"], default="latency")
+    parser.add_argument("--experiment", type=str, default=None,
+                        help="Experiment name (subdirectory under experiments/). "
+                             "Loads param overrides and writes output there.")
     args = parser.parse_args()
 
     traces_dir = ONE_SHOT_DIR / "traces"
@@ -235,18 +251,31 @@ def main() -> None:
 
     scheduler_files = sorted(args.scheduler_dir.resolve().glob("scheduler_*.py"))
     assert scheduler_files, f"No scheduler_*.py in {args.scheduler_dir}"
+
+    # Build params: canonical defaults + optional experiment overrides
+    base_params = get_canonical_base_params()
+    if args.experiment:
+        overrides = load_experiment_config(args.experiment)
+        base_params.update(overrides)
+        print(f"Experiment: {args.experiment} | overrides: {overrides}")
+
     print(f"{len(trace_files)} traces | {len(scheduler_files)} schedulers | metric={args.metric}")
 
-    # Baseline
-    base_params = get_canonical_base_params()
+    # Baseline uses experiment simulation params (e.g. duration) for fair comparison,
+    # but NOT scheduler-limiting params that would break or distort the naive scheduler.
+    SCHEDULER_LIMIT_KEYS = {"tick_timeout_ms", "max_outstanding"}
     print("Running baseline...")
-    naive_raw = get_raw_stats_for_policy(base_params, trace_files, "naive")
+    baseline_params = {k: v for k, v in base_params.items() if k not in SCHEDULER_LIMIT_KEYS}
+    naive_raw = get_raw_stats_for_policy(baseline_params, trace_files, "naive")
     assert len(naive_raw) == len(trace_files), "Baseline failed"
     baseline_med = statistics.median(extract_metrics_from_stats(naive_raw, args.metric))
     print(f"Baseline median {args.metric}: {baseline_med:.4f}")
 
-    # Output
-    output_dir = ONE_SHOT_DIR / "output" / args.scheduler_dir.resolve().name
+    # Output: experiment results go under experiments/{name}/output/
+    if args.experiment:
+        output_dir = ONE_SHOT_DIR / "experiments" / args.experiment / "output" / args.scheduler_dir.resolve().name
+    else:
+        output_dir = ONE_SHOT_DIR / "output" / args.scheduler_dir.resolve().name
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "analysis.jsonl"
     existing_by_filename = load_existing_records(output_path)

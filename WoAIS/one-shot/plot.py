@@ -268,7 +268,7 @@ def plot_success_rates(rows: list[dict], output_dir: Path) -> Path:
         loc="upper left",
     )
     _style_axes(ax)
-    out = output_dir / "success_rates_with_ci.png"
+    out = output_dir / "success_rates_with_ci.pdf"
     _save_figure(fig, out)
     return out
 
@@ -290,7 +290,7 @@ def plot_wait_time(rows: list[dict], output_dir: Path) -> Path | None:
     _style_axes(ax)
     for bar, value in zip(bars, wait_s):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{value:.1f}s", ha="center", va="bottom", fontsize=9)
-    out = output_dir / "mean_llm_wait_seconds.png"
+    out = output_dir / "mean_llm_wait_seconds.pdf"
     _save_figure(fig, out)
     return out
 
@@ -324,7 +324,7 @@ def plot_change_vs_medium(change_rows: list[dict], output_dir: Path) -> Path | N
         loc="upper left",
     )
     _style_axes(ax)
-    out = output_dir / "thinktime_change_vs_medium.png"
+    out = output_dir / "thinktime_change_vs_medium.pdf"
     _save_figure(fig, out)
     return out
 
@@ -362,7 +362,7 @@ def plot_failure_modes(rows: list[dict], output_dir: Path) -> Path | None:
     ax.legend(title="mode", loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
     fig.tight_layout()
     _style_axes(ax)
-    out = output_dir / "failure_mode_counts_stacked.png"
+    out = output_dir / "failure_mode_counts_stacked.pdf"
     _save_figure(fig, out)
     return out
 
