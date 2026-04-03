@@ -3,23 +3,21 @@ import sys
 import logging
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "spring2026" / "one-shot"))
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
 
-from simulation_utils import get_raw_stats_for_policy, deregister_scheduler
+from simulation_utils import (
+    get_raw_stats_for_policy,
+    deregister_scheduler,
+)
 
 
-def probe_priority_ordering(
+def probe_overcommit(
     scheduler_file: str,
     trace_files: list[str],
     base_params: dict,
 ) -> dict:
-    """Verify the scheduler services QUERY pipelines before BATCH.
 
-    Runs with ram_gb_per_pool=64 so only one 40 GB operator fits at a time,
-    forcing the scheduler to choose which priority class runs first.
-    Passes if mean QUERY latency < mean BATCH latency and both classes complete.
-    """
     src = Path(scheduler_file).read_text()
     key_match = re.search(r"""@register_scheduler\((?:key=)?['"]([^'"]+)['"]\)""", src)
     if not key_match:
@@ -52,7 +50,7 @@ def probe_priority_ordering(
         return {"functional": False, "failure_mode": "exec_error", "error_message": str(e)}
 
     params = base_params.copy()
-    params["ram_gb_per_pool"] = 64
+    params["allow_memory_overcommit"] = False
 
     try:
         raw = get_raw_stats_for_policy(params, trace_files[:1], key_match.group(1))
@@ -63,32 +61,13 @@ def probe_priority_ordering(
                 "error_message": f"Got {len(raw)}/1 results",
             }
 
-        stats = raw[0]
-
-        if stats.pipelines_query.completion_count == 0:
-            return {
-                "functional": False, "failure_mode": "no_query_completions",
-                "error_message": "No QUERY pipelines completed",
-            }
-        if stats.pipelines_batch.completion_count == 0:
-            return {
-                "functional": False, "failure_mode": "no_batch_completions",
-                "error_message": "No BATCH pipelines completed",
-            }
-
-        query_lat = stats.pipelines_query.mean_latency_seconds
-        batch_lat = stats.pipelines_batch.mean_latency_seconds
-
-        if query_lat >= batch_lat:
-            return {
-                "functional": False, "failure_mode": "priority_inversion",
-                "error_message": (
-                    f"QUERY mean latency ({query_lat:.2f}s) >= BATCH mean latency ({batch_lat:.2f}s); "
-                    "scheduler does not honour priority ordering"
-                ),
-            }
-
         return {"functional": True, "failure_mode": "success"}
 
     except Exception as e:
-        return {"functional": False, "failure_mode": "simulation_error", "error_message": str(e)}
+        err = str(e)
+        if "Overallocated RAM" in err:
+            return {
+                "functional": False, "failure_mode": "overcommit_violation",
+                "error_message": "Scheduler overallocated RAM when allow_memory_overcommit=False",
+            }
+        return {"functional": False, "failure_mode": "simulation_error", "error_message": err}

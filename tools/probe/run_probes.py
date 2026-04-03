@@ -13,7 +13,7 @@ import argparse
 from pathlib import Path
 
 PROBE_DIR = Path(__file__).resolve().parent
-ONE_SHOT_DIR = PROBE_DIR.parent
+ONE_SHOT_DIR = PROBE_DIR.parent.parent / "spring2026" / "one-shot"
 sys.path.insert(0, str(ONE_SHOT_DIR))
 sys.path.insert(0, str(PROBE_DIR))
 

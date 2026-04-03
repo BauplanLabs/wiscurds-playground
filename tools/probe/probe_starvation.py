@@ -3,21 +3,24 @@ import sys
 import logging
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "spring2026" / "one-shot"))
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
 
-from simulation_utils import (
-    get_raw_stats_for_policy,
-    deregister_scheduler,
-)
+from simulation_utils import get_raw_stats_for_policy, deregister_scheduler
 
 
-def probe_overcommit(
+def probe_starvation(
     scheduler_file: str,
     trace_files: list[str],
     base_params: dict,
 ) -> dict:
+    """Verify the scheduler does not completely starve BATCH pipelines.
 
+    Runs with a short duration (60s) and ram_gb_per_pool=64 so that the QUERY
+    workload in the trace exceeds the available time — a purely priority-correct
+    scheduler with no fairness mechanism will leave BATCH with zero completions.
+    Passes if at least one BATCH pipeline completes.
+    """
     src = Path(scheduler_file).read_text()
     key_match = re.search(r"""@register_scheduler\((?:key=)?['"]([^'"]+)['"]\)""", src)
     if not key_match:
@@ -50,7 +53,8 @@ def probe_overcommit(
         return {"functional": False, "failure_mode": "exec_error", "error_message": str(e)}
 
     params = base_params.copy()
-    params["allow_memory_overcommit"] = False
+    params["ram_gb_per_pool"] = 64
+    params["duration"] = 60
 
     try:
         raw = get_raw_stats_for_policy(params, trace_files[:1], key_match.group(1))
@@ -61,13 +65,18 @@ def probe_overcommit(
                 "error_message": f"Got {len(raw)}/1 results",
             }
 
+        stats = raw[0]
+
+        if stats.pipelines_batch.completion_count == 0:
+            return {
+                "functional": False, "failure_mode": "batch_starvation",
+                "error_message": (
+                    f"0/{stats.pipelines_batch.arrival_count} BATCH pipelines completed; "
+                    "scheduler starved low-priority work entirely"
+                ),
+            }
+
         return {"functional": True, "failure_mode": "success"}
 
     except Exception as e:
-        err = str(e)
-        if "Overallocated RAM" in err:
-            return {
-                "functional": False, "failure_mode": "overcommit_violation",
-                "error_message": "Scheduler overallocated RAM when allow_memory_overcommit=False",
-            }
-        return {"functional": False, "failure_mode": "simulation_error", "error_message": err}
+        return {"functional": False, "failure_mode": "simulation_error", "error_message": str(e)}

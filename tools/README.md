@@ -28,6 +28,34 @@ For anything beyond the demo, write a short Python script that imports the gener
 
 ---
 
+## Core Research features
+
+Reproducibility — single seeded RNG means the same config always produces identical traces. Critical for fair comparison across effort levels.
+
+Priority mix control — weight on each PipelineSpec lets you dial in exact QUERY/INTERACTIVE/BATCH ratios. You can create QUERY-heavy traces to stress priority
+logic or BATCH-heavy traces to test throughput.
+
+Burst injection — BurstSpec creates sudden arrival spikes at precise simulation times, forcing schedulers to make real priority decisions under backlog pressure
+rather than coasting through smooth arrivals.
+
+Operator count bounds — num_ops_min/num_ops_max let you control pipeline complexity precisely. Setting both equal gives fixed-length pipelines for deterministic
+comparisons; leaving them open gives realistic variance.
+
+cpu_io_ratio — shifts the resource profile of operators from IO-bound to CPU-bound without having to define custom profiles. Lets you test whether schedulers
+that assume IO-heavy workloads degrade on CPU-heavy ones.
+
+DAG shape control — linear, branch_in, branch_out shapes produce different dependency structures that expose scheduler bugs in dependency tracking and parallel
+operator scheduling.
+
+noisy_label with custom noise functions — directly supports the noisy oracle research angle. You can generate the same trace at multiple noise levels (10%, 30%,
+60%) and compare scheduler/estimator performance across them.
+
+LabelSpec extensibility — any per-operator metadata an estimator might need (file sizes, op types, noisy resource hints) can be attached as extra columns without
+touching the simulator.
+
+Composable config objects — each axis of the workload (arrival timing, pipeline shape, resource profile, labels) is independently controlled, so you can isolate
+one variable at a time — exactly what you need for a controlled experiment.
+
 ## Core concepts
 
 ### SegmentProfile

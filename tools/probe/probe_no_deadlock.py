@@ -3,7 +3,7 @@ import sys
 import logging
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "spring2026" / "one-shot"))
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
 
 from simulation_utils import get_raw_stats_for_policy, deregister_scheduler

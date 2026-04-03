@@ -3,7 +3,7 @@ import sys
 import logging
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "spring2026" / "one-shot"))
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
 
 from config import get_canonical_base_params
@@ -13,13 +13,17 @@ from simulation_utils import (
     deregister_scheduler,
 )
 
-def probe_basic_run(
+def probe_suspend_run(
     scheduler_file: str,
     trace_files: list[str],
     base_params: dict,
 ) -> dict:
 
     src = Path(scheduler_file).read_text()
+
+    if "Suspend(" not in src:
+        return {"functional": False, "failure_mode": "no_suspend_usage", "error_message": "Source code could does not contain line to suspend pipelines"}
+
     key_match = re.search(r"""@register_scheduler\((?:key=)?['"]([^'"]+)['"]\)""", src)
     if not key_match:
         return {"functional": False, "failure_mode": "no_scheduler_key"}
@@ -49,16 +53,27 @@ def probe_basic_run(
         exec(src, worker_globals)
     except Exception as e:
         return {"functional": False, "failure_mode": "exec_error", "error_message": str(e)}
+
+    simulation_params = base_params.copy()
+    simulation_params["ram_gb_per_pool"] = 64
     
     try:
-        raw = get_raw_stats_for_policy(base_params, trace_files[:1], key_match.group(1))    
+        raw = get_raw_stats_for_policy(simulation_params, trace_files[:1], key_match.group(1))    
 
-        if len(raw) == 0:
+        if len(raw) != 1:
 
             return {
                 "functional": False, "failure_mode": "simulation_error",
                 "error_message": f"Got {len(raw)}/1 results",
             }
+
+        
+        if raw[0].suspensions == 0:
+            return {
+                "functional": False, "failure_mode": "no_suspensions",
+                "error_message": f"Got a suspension rate of 0 when suspensions should be higher",
+            }
+
 
         return {
             "functional": True, "failure_mode": "success",

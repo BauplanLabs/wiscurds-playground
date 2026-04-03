@@ -3,16 +3,17 @@ import sys
 import logging
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "spring2026" / "one-shot"))
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
 
+from config import get_canonical_base_params
 from simulation_utils import (
+    get_last_simulation_failure,
     get_raw_stats_for_policy,
     deregister_scheduler,
 )
 
-
-def probe_grouping(
+def probe_basic_run(
     scheduler_file: str,
     trace_files: list[str],
     base_params: dict,
@@ -48,26 +49,20 @@ def probe_grouping(
         exec(src, worker_globals)
     except Exception as e:
         return {"functional": False, "failure_mode": "exec_error", "error_message": str(e)}
-
-    params = base_params.copy()
-    params["multi_operator_containers"] = False
-
+    
     try:
-        raw = get_raw_stats_for_policy(params, trace_files[:1], key_match.group(1))
+        raw = get_raw_stats_for_policy(base_params, trace_files[:1], key_match.group(1))    
 
-        if len(raw) != 1:
+        if len(raw) == 0:
+
             return {
                 "functional": False, "failure_mode": "simulation_error",
                 "error_message": f"Got {len(raw)}/1 results",
             }
 
-        return {"functional": True, "failure_mode": "success"}
+        return {
+            "functional": True, "failure_mode": "success",
+        }
 
     except Exception as e:
-        err = str(e)
-        if "exactly 1 operator" in err:
-            return {
-                "functional": False, "failure_mode": "multi_op_violation",
-                "error_message": "Scheduler grouped multiple operators into one assignment when multi_operator_containers=False",
-            }
-        return {"functional": False, "failure_mode": "simulation_error", "error_message": err}
+        return {"functional": False, "failure_mode": "simulation_error", "error_message": str(e)}
