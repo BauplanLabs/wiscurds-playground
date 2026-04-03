@@ -1,4 +1,0 @@
-temperature,reasoning_effort,functional_mean,beat_baseline_mean,functional_pct_change_vs_medium,beat_baseline_pct_change_vs_medium
-1.0,none,0.72,0.72,-2.7027027027027053,9.090909090909081
-1.0,low,0.74,0.72,0.0,9.090909090909081
-1.0,high,0.78,0.78,5.405405405405411,18.18181818181818

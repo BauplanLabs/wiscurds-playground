@@ -1,5 +1,0 @@
-condition_id,temperature,reasoning_effort,n_trials,functional_successes,better_than_baseline_successes,functional_mean,functional_wilson_95_low,functional_wilson_95_high,beat_baseline_mean,beat_baseline_wilson_95_low,beat_baseline_wilson_95_high,mean_llm_wait_seconds,failure_mode_counts
-effort_none,1.0,none,50,36,36,0.72,0.5833461285401034,0.8252598564231963,0.72,0.5833461285401034,0.8252598564231963,41.1104,"{""simulation_error"": 11, ""success"": 36, ""total_timeout"": 3}"
-effort_low,1.0,low,50,37,36,0.74,0.6044657801100008,0.8412862034863262,0.72,0.5833461285401034,0.8252598564231963,47.1096,"{""simulation_error"": 9, ""success"": 37, ""total_timeout"": 4}"
-effort_medium,1.0,medium,50,37,33,0.74,0.6044657801100008,0.8412862034863262,0.66,0.5215356854148285,0.7756323036493895,91.9526,"{""simulation_error"": 7, ""success"": 37, ""total_timeout"": 6}"
-effort_high,1.0,high,50,39,39,0.78,0.6475818431054045,0.8724621377569771,0.78,0.6475818431054045,0.8724621377569771,147.6274,"{""simulation_error"": 7, ""success"": 39, ""total_timeout"": 4}"

@@ -206,6 +206,35 @@ def _infer_op_type(ctx: OperatorContext) -> str:
 
 
 # ---------------------------------------------------------------------------
+# BurstSpec — a one-time spike of pipelines at a fixed simulation time
+# ---------------------------------------------------------------------------
+
+@dataclass
+class BurstSpec:
+    """
+    Injects a fixed number of pipelines at a specific simulation time,
+    independent of the regular ArrivalPattern cadence.
+
+    Parameters
+    ----------
+    time_seconds : float
+        Simulation time at which the burst arrives.
+    num_pipelines : int
+        Number of pipelines to inject at that time.
+    spec_index : int | None
+        Index into TraceConfig.pipeline_specs to use for all burst pipelines.
+        None (default) samples proportionally to each spec's weight, the same
+        way regular arrivals do.
+
+    Example — 20 QUERY pipelines spike at t=60s:
+        bursts=[BurstSpec(time_seconds=60, num_pipelines=20, spec_index=0)]
+    """
+    time_seconds: float
+    num_pipelines: int
+    spec_index: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
 # ArrivalPattern — controls when batches of pipelines arrive
 # ---------------------------------------------------------------------------
 
@@ -286,6 +315,8 @@ class PipelineSpec:
     def interactive(
         cls,
         num_ops_mean: float = 5,
+        num_ops_min: int = 1,
+        num_ops_max: Optional[int] = None,
         weight: float = 0.3,
         dag_shapes: Optional[list[str]] = None,
         dag_shape_weights: Optional[list[float]] = None,
@@ -298,6 +329,8 @@ class PipelineSpec:
             priority="INTERACTIVE",
             weight=weight,
             num_ops_mean=num_ops_mean,
+            num_ops_min=num_ops_min,
+            num_ops_max=num_ops_max,
             dag_shapes=dag_shapes,
             dag_shape_weights=dag_shape_weights,
             cpu_io_ratio=cpu_io_ratio,
@@ -309,6 +342,8 @@ class PipelineSpec:
     def batch(
         cls,
         num_ops_mean: float = 5,
+        num_ops_min: int = 1,
+        num_ops_max: Optional[int] = None,
         weight: float = 0.6,
         dag_shapes: Optional[list[str]] = None,
         dag_shape_weights: Optional[list[float]] = None,
@@ -321,6 +356,8 @@ class PipelineSpec:
             priority="BATCH_PIPELINE",
             weight=weight,
             num_ops_mean=num_ops_mean,
+            num_ops_min=num_ops_min,
+            num_ops_max=num_ops_max,
             dag_shapes=dag_shapes,
             dag_shape_weights=dag_shape_weights,
             cpu_io_ratio=cpu_io_ratio,
@@ -334,6 +371,8 @@ class PipelineSpec:
         priority: str,
         weight: float,
         num_ops_mean: float,
+        num_ops_min: int,
+        num_ops_max: Optional[int],
         dag_shapes: Optional[list[str]],
         dag_shape_weights: Optional[list[float]],
         cpu_io_ratio: float,
@@ -348,7 +387,10 @@ class PipelineSpec:
 
         def _num_ops(rng: np.random.Generator) -> int:
             n = int(rng.normal(num_ops_mean, stdev))
-            return max(1, n)
+            n = max(num_ops_min, n)
+            if num_ops_max is not None:
+                n = min(num_ops_max, n)
+            return n
 
         def _dag_shape(rng: np.random.Generator) -> str:
             idx = rng.choice(len(shapes), p=shape_w)
@@ -413,6 +455,7 @@ class TraceConfig:
     pipeline_specs: list[PipelineSpec]
     arrival_pattern: ArrivalPattern
     random_seed: int = 42
+    bursts: list[BurstSpec] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -469,24 +512,43 @@ class TraceGenerator:
         pipeline_counter = 0
         rows: list[TraceRow] = []
 
+        # Pre-sort bursts by time so we can consume them in order
+        pending_bursts = sorted(cfg.bursts, key=lambda b: b.time_seconds)
+        burst_idx = 0
+
         # Arrival tick tracking — mirrors Eudoxia's WorkloadGenerator
         ticks_since_last = 0
         waiting_ticks = 0   # first batch arrives at tick 0
 
         for tick in range(max_ticks):
+            current_seconds = tick * tick_length
+
+            # Emit any bursts whose time has arrived, before regular arrivals
+            while burst_idx < len(pending_bursts) and pending_bursts[burst_idx].time_seconds <= current_seconds:
+                burst = pending_bursts[burst_idx]
+                for _ in range(burst.num_pipelines):
+                    pipeline_counter += 1
+                    if burst.spec_index is not None:
+                        spec = cfg.pipeline_specs[burst.spec_index]
+                    else:
+                        spec = cfg.pipeline_specs[rng.choice(len(cfg.pipeline_specs), p=weights)]
+                    pipeline_rows = self._generate_pipeline(
+                        f"p{pipeline_counter}", burst.time_seconds, spec, rng
+                    )
+                    rows.extend(pipeline_rows)
+                burst_idx += 1
+
             if ticks_since_last < waiting_ticks:
                 ticks_since_last += 1
                 continue
 
-            # Emit a batch of pipelines at this tick
-            arrival_seconds = tick * tick_length
+            # Emit a regular batch of pipelines at this tick
             for _ in range(ap.num_pipelines_per_batch):
                 pipeline_counter += 1
                 spec_idx = rng.choice(len(cfg.pipeline_specs), p=weights)
                 spec = cfg.pipeline_specs[spec_idx]
-                pipeline_id = f"p{pipeline_counter}"
                 pipeline_rows = self._generate_pipeline(
-                    pipeline_id, arrival_seconds, spec, rng
+                    f"p{pipeline_counter}", current_seconds, spec, rng
                 )
                 rows.extend(pipeline_rows)
 
