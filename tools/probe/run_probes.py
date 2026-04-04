@@ -5,11 +5,18 @@ Usage:
     python run_probes.py scheduler_low_001.py
     python run_probes.py schedulers-low/
     python run_probes.py schedulers-low/ schedulers-high/
+
+When a directory is given, results are also written to:
+    spring2026/one-shot/analyses/schedulers-{effort}.csv
+One row per scheduler, one column per probe (pass or failure_mode).
 """
 from __future__ import annotations
 
+import csv
+import re
 import sys
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 PROBE_DIR = Path(__file__).resolve().parent
@@ -97,6 +104,36 @@ def print_results(scheduler_file: Path, results: dict[str, dict]) -> None:
         print(f"  {ok}  {probe_name}{detail}")
 
 
+PROBE_NAMES = [
+    "syntax", "valid_scheduler", "basic_run", "retry_run", "suspend_run",
+    "grouping", "overcommit", "priority_ordering", "starvation", "no_deadlock",
+]
+
+
+def _effort_from_dir(directory: Path) -> str:
+    """Extract effort label from a directory named schedulers-{effort}."""
+    m = re.search(r"schedulers-(\w+)", directory.name)
+    return m.group(1) if m else directory.name
+
+
+def _csv_value(results: dict[str, dict], probe: str) -> str:
+    if probe not in results:
+        return "skipped"
+    r = results[probe]
+    return "pass" if r.get("functional") else r.get("failure_mode", "fail")
+
+
+def write_csv(scheduler_files: list[Path], all_results: list[dict[str, dict]], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["scheduler"] + PROBE_NAMES)
+        for sf, results in zip(scheduler_files, all_results):
+            row = [sf.name] + [_csv_value(results, p) for p in PROBE_NAMES]
+            writer.writerow(row)
+    print(f"\nCSV written to {output_path}")
+
+
 def collect_scheduler_files(paths: list[Path]) -> list[Path]:
     files = []
     for p in paths:
@@ -109,31 +146,77 @@ def collect_scheduler_files(paths: list[Path]) -> list[Path]:
     return files
 
 
+def _worker(args: tuple) -> tuple[Path, dict[str, dict]]:
+    """Top-level worker function for ProcessPoolExecutor (must be picklable)."""
+    scheduler_file, base_params, traces = args
+    results = run_all_probes(scheduler_file, base_params, traces)
+    return scheduler_file, results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("targets", nargs="+", type=Path,
                         help="Scheduler .py file(s) or director(ies) containing scheduler_*.py files.")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of parallel workers for directory targets (default: 1).")
     args = parser.parse_args()
-
-    scheduler_files = collect_scheduler_files(args.targets)
-    if not scheduler_files:
-        print("No scheduler files found.")
-        sys.exit(1)
 
     print(f"Ensuring probe traces exist...")
     traces = ensure_traces()
-
     base_params = get_canonical_base_params()
 
-    total_pass = 0
-    for sf in scheduler_files:
+    # Process directory targets separately so each gets its own CSV
+    dir_targets = [p for p in args.targets if Path(p).is_dir()]
+    file_targets = [p for p in args.targets if Path(p).is_file()]
+
+    # Individual files — text output only (always sequential)
+    for sf in sorted(f for p in file_targets for f in [Path(p)]):
         results = run_all_probes(sf, base_params, traces)
         print_results(sf, results)
-        if all(r.get("functional") for r in results.values()):
-            total_pass += 1
 
-    print(f"\n{'='*50}")
-    print(f"DONE: {total_pass}/{len(scheduler_files)} schedulers passed all probes")
+    # Directories — text output + CSV per directory
+    for directory in dir_targets:
+        directory = Path(directory)
+        scheduler_files = sorted(directory.glob("scheduler_*.py"))
+        if not scheduler_files:
+            print(f"No scheduler_*.py found in {directory}, skipping.")
+            continue
+
+        results_by_file: dict[Path, dict[str, dict]] = {}
+
+        if args.workers > 1:
+            worker_args = [(sf, base_params, traces) for sf in scheduler_files]
+            with ProcessPoolExecutor(max_workers=args.workers) as executor:
+                futures = {executor.submit(_worker, wa): wa[0] for wa in worker_args}
+                for future in as_completed(futures):
+                    sf, results = future.result()
+                    results_by_file[sf] = results
+                    passed = sum(1 for r in results.values() if r.get("functional"))
+                    total = len(results)
+                    status = "PASS" if passed == total else "FAIL"
+                    print(f"  [{status}] {sf.name}  ({passed}/{total})")
+            # Print full detail after all complete
+            for sf in scheduler_files:
+                print_results(sf, results_by_file[sf])
+        else:
+            for sf in scheduler_files:
+                results = run_all_probes(sf, base_params, traces)
+                print_results(sf, results)
+                results_by_file[sf] = results
+
+        all_results = [results_by_file[sf] for sf in scheduler_files]
+        total_pass = sum(1 for r in all_results if all(v.get("functional") for v in r.values()))
+
+        print(f"\n{'='*50}")
+        print(f"DONE: {total_pass}/{len(scheduler_files)} schedulers passed all probes")
+
+        effort = _effort_from_dir(directory)
+        csv_path = ONE_SHOT_DIR / "analyses" / f"schedulers-{effort}.csv"
+        write_csv(scheduler_files, all_results, csv_path)
+
+    if not dir_targets and not file_targets:
+        print("No scheduler files found.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
