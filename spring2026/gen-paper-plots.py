@@ -51,11 +51,10 @@ def _load_probe_csv(effort: str) -> pd.DataFrame | None:
         return None
 
 
-def probe_pass_rates(args):
+def _load_probe_data():
+    """Load and compute pass rates from all available effort CSVs."""
     probes = list(PROBE_LABELS.keys())
-
-    # Load available effort CSVs
-    data: dict[str, dict[str, float]] = {}  # effort -> probe -> pass_pct
+    data: dict[str, dict[str, float]] = {}
     for effort in EFFORT_ORDER:
         df = _load_probe_csv(effort)
         if df is None:
@@ -69,19 +68,16 @@ def probe_pass_rates(args):
             valid = col[col != "skipped"]
             rates[probe] = (valid == "pass").sum() / len(valid) * 100 if len(valid) > 0 else float("nan")
         data[effort] = rates
+    return data
 
-    if not data:
-        print("No probe CSV files found in one-shot/analyses/. Run run_probes.py on a directory first.")
-        return
 
+def _draw_probe_pass_rates(ax, data: dict, bar_width_total: float = 0.7):
+    probes = list(PROBE_LABELS.keys())
     efforts = [e for e in EFFORT_ORDER if e in data]
     n_efforts = len(efforts)
     n_probes = len(probes)
-
-    bar_width = 0.7 / n_efforts
+    bar_width = bar_width_total / n_efforts
     cluster_centers = np.arange(n_probes)
-
-    fig, ax = plt.subplots(figsize=(7, 2.5))
 
     for i, effort in enumerate(efforts):
         offsets = cluster_centers + (i - (n_efforts - 1) / 2) * bar_width
@@ -98,16 +94,9 @@ def probe_pass_rates(args):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.legend(frameon=False, fontsize=8)
-    fig.tight_layout()
-
-    import os
-    os.makedirs("paper-plots", exist_ok=True)
-    plt.savefig("paper-plots/probe-pass-rates.pdf")
-    plt.close(fig)
-    print("Saved paper-plots/probe-pass-rates.pdf")
 
 
-def one_shot_latency_cdf(args):
+def _load_latency_data():
     no_est = load_analysis("one-shot/output/schedulers-low/analysis.jsonl")
     est = load_analysis("one-shot-est/output-low-v2/sigma_0.0/analysis.jsonl")
 
@@ -121,8 +110,10 @@ def one_shot_latency_cdf(args):
 
     no_est["geo_mean"] = no_est["metric_values"].map(geometric_mean)
     est["geo_mean"] = est["metric_values"].map(geometric_mean)
+    return no_est, est
 
-    fig, ax = plt.subplots(figsize=(3.5, 2.5))
+
+def _draw_latency_cdf(ax, no_est, est):
     plot_cdf(ax, no_est["geo_mean"].dropna(), "No Estimates", color="black")
     plot_cdf(ax, est["geo_mean"].dropna(), "With Estimates", color="red")
     ax.set_xlabel("Latency (Geometric Mean, Seconds)")
@@ -132,9 +123,53 @@ def one_shot_latency_cdf(args):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.legend(frameon=False)
+
+
+def probe_pass_rates(args):
+    data = _load_probe_data()
+    if not data:
+        print("No probe CSV files found in one-shot/analyses/. Run run_probes.py on a directory first.")
+        return
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    _draw_probe_pass_rates(ax, data, bar_width_total=0.7)
     fig.tight_layout()
+    import os
+    os.makedirs("paper-plots", exist_ok=True)
+    plt.savefig("paper-plots/probe-pass-rates.pdf")
+    plt.close(fig)
+    print("Saved paper-plots/probe-pass-rates.pdf")
+
+
+def one_shot_latency_cdf(args):
+    no_est, est = _load_latency_data()
+    fig, ax = plt.subplots(figsize=(3.5, 2.5))
+    _draw_latency_cdf(ax, no_est, est)
+    fig.tight_layout()
+    import os
+    os.makedirs("paper-plots", exist_ok=True)
     plt.savefig("paper-plots/one-shot-latency-cdf.pdf")
     plt.close(fig)
+
+
+def probe_and_cdf(args):
+    data = _load_probe_data()
+    if not data:
+        print("No probe CSV files found in one-shot/analyses/. Run run_probes.py on a directory first.")
+        return
+    no_est, est = _load_latency_data()
+
+    fig, (ax_probes, ax_cdf) = plt.subplots(
+        1, 2, figsize=(10.5, 2.5),
+        gridspec_kw={"width_ratios": [2, 1]},
+    )
+    _draw_probe_pass_rates(ax_probes, data, bar_width_total=0.95)
+    _draw_latency_cdf(ax_cdf, no_est, est)
+    fig.tight_layout()
+    import os
+    os.makedirs("paper-plots", exist_ok=True)
+    plt.savefig("paper-plots/probe-and-cdf.pdf")
+    plt.close(fig)
+    print("Saved paper-plots/probe-and-cdf.pdf")
 
 
 def main():
@@ -143,12 +178,14 @@ def main():
 
     sub.add_parser("one-shot-latency-cdf", help="CDF of one-shot latency")
     sub.add_parser("probe-pass-rates", help="Clustered bar chart: pass rate per probe per effort level")
+    sub.add_parser("probe-and-cdf", help="Combined figure: probe pass rates (left) + latency CDF (right)")
     sub.add_parser("all", help="Run all subcommands")
 
     args = parser.parse_args()
     commands = {
         "one-shot-latency-cdf": one_shot_latency_cdf,
         "probe-pass-rates": probe_pass_rates,
+        "probe-and-cdf": probe_and_cdf,
     }
     if args.command == "all":
         for name, func in commands.items():
