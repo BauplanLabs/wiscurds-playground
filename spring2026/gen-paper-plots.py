@@ -15,11 +15,12 @@ OUTPUT_DIR = Path("paper-plots")
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _save(fig, name: str) -> None:
+def _save(fig, name: str, tight: bool = True) -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
     path = OUTPUT_DIR / name
-    fig.tight_layout()
-    fig.savefig(path)
+    if tight:
+        fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"Saved {path}")
 
@@ -34,10 +35,11 @@ def _ygrid(ax) -> None:
     ax.set_axisbelow(True)
 
 
-def plot_cdf(ax, values, label, color="black"):
+def plot_cdf(ax, values, label, color="black", linestyle="-", linewidth=1.0):
     sorted_vals = np.sort(values)
     cdf = np.arange(1, len(sorted_vals) + 1) / len(sorted_vals) * 100
-    ax.step(sorted_vals, cdf, where="post", label=label, color=color)
+    ax.step(sorted_vals, cdf, where="post", label=label, color=color,
+            linestyle=linestyle, linewidth=linewidth)
 
 
 def geometric_mean(values):
@@ -77,13 +79,13 @@ PROBE_LABELS = {
     "suspend_run":       "Suspend",
     "grouping":          "Grouping",
     "overcommit":        "Overcommit",
-    "priority_ordering": "Priority\nOrder",
+    "priority_ordering": "Priority-Order",
     "starvation":        "Starvation",
-    "no_deadlock":       "No\nDeadlock",
+    "no_deadlock":       "No-Deadlock",
 }
 
 EFFORT_ORDER  = ["low", "medium", "high"]
-EFFORT_COLORS = {"low": "#aaaaaa", "medium": "#555555", "high": "#000000"}
+EFFORT_COLORS = {"low": "#4878d0", "medium": "#ee854a", "high": "#6acc65"}
 
 
 def _load_probe_csv(effort: str) -> pd.DataFrame | None:
@@ -157,8 +159,8 @@ def _load_latency_data():
 
 
 def _draw_latency_cdf(ax, no_est, est):
-    plot_cdf(ax, no_est["geo_mean"].dropna(), "No Estimates", color="black")
-    plot_cdf(ax, est["geo_mean"].dropna(),    "With Estimates", color="red")
+    plot_cdf(ax, no_est["geo_mean"].dropna(), "No Estimates",   color="#e83030", linestyle="-", linewidth=1.0)
+    plot_cdf(ax, est["geo_mean"].dropna(),    "With Estimates", color="#7b2d8b", linestyle="-", linewidth=1.0)
     ax.set_xlabel("Latency (Geometric Mean, Seconds)")
     ax.set_ylabel("% of Schedulers")
     ax.set_xlim(left=0)
@@ -390,13 +392,34 @@ def probe_and_cdf(args):
         print("No probe CSV files found in one-shot/analyses/. Run run_probes.py on a directory first.")
         return
     no_est, est = _load_latency_data()
+
     fig, (ax_probes, ax_cdf) = plt.subplots(
-        1, 2, figsize=(10.5, 2.5),
-        gridspec_kw={"width_ratios": [2, 1]},
+        1, 2, figsize=(3.5, 2.2),
+        gridspec_kw={"width_ratios": [1, 1]},
     )
-    _draw_probe_pass_rates(ax_probes, data, bar_width_total=0.95)
+
+    _draw_probe_pass_rates(ax_probes, data, bar_width_total=0.6)
+    ax_probes.yaxis.grid(False)
+    ax_probes.set_title("(a) Scheduler Properties", loc="center", fontsize=7, pad=3)
+    ax_probes.set_ylabel("% Passing", fontsize=7)
+    ax_probes.tick_params(axis="y", labelsize=6)
+    plt.setp(ax_probes.get_xticklabels(), rotation=90, ha="center", fontsize=6)
+    ax_probes.legend(frameon=False, fontsize=5, ncol=3,
+                     loc="lower center", bbox_to_anchor=(0.5, 1.18),
+                     handlelength=1.0, handleheight=0.8)
+
     _draw_latency_cdf(ax_cdf, no_est, est)
-    _save(fig, "probe-and-cdf.pdf")
+    ax_cdf.autoscale(axis="x", tight=True)
+    ax_cdf.set_xlim(left=0)
+    ax_cdf.set_title("(b) Latency Distribution", loc="center", fontsize=7, pad=3)
+    ax_cdf.set_xlabel("Latency (s)", fontsize=7)
+    ax_cdf.set_ylabel("% of Schedulers", fontsize=7)
+    ax_cdf.tick_params(labelsize=6)
+    ax_cdf.legend(frameon=False, fontsize=5, ncol=2,
+                  loc="lower center", bbox_to_anchor=(0.5, 1.18))
+
+    fig.tight_layout(pad=0.3, w_pad=0.5)
+    _save(fig, "probe-and-cdf.pdf", tight=False)
 
 
 def success_rates(args):
