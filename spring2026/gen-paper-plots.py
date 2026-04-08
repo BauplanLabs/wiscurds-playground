@@ -19,7 +19,7 @@ def _save(fig, name: str) -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
     path = OUTPUT_DIR / name
     fig.tight_layout()
-    fig.savefig(path)
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {path}")
 
@@ -34,10 +34,10 @@ def _ygrid(ax) -> None:
     ax.set_axisbelow(True)
 
 
-def plot_cdf(ax, values, label, color="black"):
+def plot_cdf(ax, values, label, color="black", linewidth=1.0):
     sorted_vals = np.sort(values)
     cdf = np.arange(1, len(sorted_vals) + 1) / len(sorted_vals) * 100
-    ax.step(sorted_vals, cdf, where="post", label=label, color=color)
+    ax.step(sorted_vals, cdf, where="post", label=label, color=color, linewidth=linewidth)
 
 
 def geometric_mean(values):
@@ -82,8 +82,8 @@ PROBE_LABELS = {
     "no_deadlock":       "No\nDeadlock",
 }
 
-EFFORT_ORDER  = ["low", "medium", "high"]
-EFFORT_COLORS = {"low": "#aaaaaa", "medium": "#555555", "high": "#000000"}
+EFFORT_ORDER  = ["none", "low", "medium", "high"]
+EFFORT_COLORS = {"none": "#c6dbef", "low": "#6baed6", "medium": "#2171b5", "high": "#08306b"}
 
 
 def _load_probe_csv(effort: str) -> pd.DataFrame | None:
@@ -124,15 +124,16 @@ def _draw_probe_pass_rates(ax, data: dict, bar_width_total: float = 0.7):
         offsets = cluster_centers + (i - (n_efforts - 1) / 2) * bar_width
         values = [data[effort].get(p, float("nan")) for p in probes]
         ax.bar(offsets, values, width=bar_width, label=effort.capitalize(),
-               color=EFFORT_COLORS[effort], zorder=2)
+               color=EFFORT_COLORS[effort], zorder=2, linewidth=0)
 
     ax.set_xticks(cluster_centers)
-    ax.set_xticklabels([PROBE_LABELS[p] for p in probes], fontsize=7)
-    ax.set_ylabel("% Schedulers Passing")
+    ax.set_xticklabels([PROBE_LABELS[p] for p in probes], fontsize=4, rotation=90, ha="center")
+    ax.set_ylabel("% Passing", fontsize=5)
+    ax.tick_params(axis="y", labelsize=5)
     ax.set_ylim(0, 100)
     _ygrid(ax)
     _style(ax)
-    ax.legend(frameon=False, fontsize=8)
+    ax.legend(frameon=False, fontsize=4, loc="lower left")
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +166,31 @@ def _draw_latency_cdf(ax, no_est, est):
     ax.set_ylim(0, 100)
     _style(ax)
     ax.legend(frameon=False)
+
+
+def _latency_by_effort() -> dict[str, np.ndarray]:
+    """Return {effort: array of geo-mean latencies} from one-shot output."""
+    records = _load_effort_records()
+    grouped: dict[str, list] = {}
+    for r in records:
+        effort = str(r.get("reasoning_effort", "unknown"))
+        mv = r.get("metric_values")
+        if mv is not None:
+            grouped.setdefault(effort, []).append(geometric_mean(mv))
+    return {e: np.array(v) for e, v in grouped.items()}
+
+
+def _draw_latency_cdf_by_effort(ax, data: dict[str, np.ndarray]):
+    efforts = [e for e in EFFORT_ORDER if e in data]
+    for effort in efforts:
+        plot_cdf(ax, data[effort], effort.capitalize(), color=EFFORT_COLORS.get(effort, "gray"))
+    ax.set_xlabel("Latency (s)", fontsize=5)
+    ax.set_ylabel("% of Schedulers", fontsize=5)
+    ax.tick_params(axis="both", labelsize=5)
+    ax.set_xlim(0, 1000)
+    ax.set_ylim(0, 100)
+    _style(ax)
+    ax.legend(frameon=False, fontsize=4)
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +425,32 @@ def probe_and_cdf(args):
     _save(fig, "probe-and-cdf.pdf")
 
 
+def plot1(args):
+    probe_data = _load_probe_data()
+    if not probe_data:
+        print("No probe CSV files found in one-shot/analyses/.")
+        return
+    latency_data = _latency_by_effort()
+    if not latency_data:
+        print("No latency data found in one-shot/output/.")
+        return
+    fig, (ax_probes, ax_cdf) = plt.subplots(
+        1, 2, figsize=(3.3, 1.8),
+        gridspec_kw={"width_ratios": [1, 1]},
+    )
+    _draw_probe_pass_rates(ax_probes, probe_data, bar_width_total=0.65)
+    ax_probes.get_legend().remove()
+    ax_probes.set_title("(a) Scheduler Properties", fontsize=6)
+    _draw_latency_cdf_by_effort(ax_cdf, latency_data)
+    ax_cdf.get_legend().remove()
+    ax_cdf.set_title("(b) Latency Distribution", fontsize=6)
+    # shared legend at top
+    handles, labels = ax_cdf.get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, fontsize=4, ncol=4,
+               loc="upper center", bbox_to_anchor=(0.5, 1.05))
+    _save(fig, "plot1.pdf")
+
+
 def success_rates(args):
     records = _load_effort_records()
     if not records:
@@ -455,6 +507,7 @@ def main():
     sub.add_parser("probe-pass-rates",    help="Clustered bar chart: pass rate per probe per effort level")
     sub.add_parser("one-shot-latency-cdf", help="CDF of one-shot latency")
     sub.add_parser("probe-and-cdf",       help="Combined: probe pass rates (left) + latency CDF (right)")
+    sub.add_parser("plot1",               help="Probe pass rates (left) + latency CDF by effort level (right)")
     sub.add_parser("success-rates",       help="Success rate + beats-baseline per effort level with 95pct CI")
     sub.add_parser("wait-time",           help="Mean LLM generation time per effort level")
     sub.add_parser("change-vs-medium",    help="Percent change in success rates relative to medium effort")
@@ -466,6 +519,7 @@ def main():
         "probe-pass-rates":     probe_pass_rates,
         "one-shot-latency-cdf": one_shot_latency_cdf,
         "probe-and-cdf":        probe_and_cdf,
+        "plot1":                plot1,
         "success-rates":        success_rates,
         "wait-time":            wait_time,
         "change-vs-medium":     change_vs_medium,
