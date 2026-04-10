@@ -221,7 +221,6 @@ def extract_code(text: str) -> str:
 
 def main() -> None:
     load_dotenv()
-    assert os.environ.get("OPENAI_API_KEY"), "OPENAI_API_KEY not set"
 
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -231,6 +230,9 @@ def main() -> None:
                         help="Scheduler .py file to improve.")
     parser.add_argument("--trace", type=Path, required=True,
                         help="Fixed trace file (.csv) to evaluate on.")
+    parser.add_argument("--output", type=Path, default=None,
+                        help="Output path for improved scheduler. "
+                             "Default: scheduler_iter/<stem>_iter1.py")
     parser.add_argument("--scales", default="1,2,4,8,16",
                         help="Comma-separated cluster scale multipliers (default: 1,2,4,8,16).")
     parser.add_argument("--model", default="gpt-5.2-2025-12-11",
@@ -244,11 +246,13 @@ def main() -> None:
 
     assert args.scheduler.exists(), f"Scheduler not found: {args.scheduler}"
     assert args.trace.exists(), f"Trace not found: {args.trace}"
+    if not args.dry_run:
+        assert os.environ.get("OPENAI_API_KEY"), "OPENAI_API_KEY not set"
 
     scales = [int(s.strip()) for s in args.scales.split(",")]
     assert scales, "Need at least one scale."
 
-    output_path = ONE_SHOT_DIR / "scheduler_iter" / f"{args.scheduler.stem}_iter1.py"
+    output_path = args.output or (ONE_SHOT_DIR / "scheduler_iter" / f"{args.scheduler.stem}_iter1.py")
 
     base_params = get_canonical_base_params()
 
@@ -264,7 +268,7 @@ def main() -> None:
         import random
         rng = random.Random(42)
         scale_results = {
-            scale: {"ok": True, "latency": round(rng.uniform(0.05, 2.0), 4)}
+            scale: {"ok": True, "latency": round(rng.uniform(100, 300), 4)}
             for scale in scales
         }
         for scale, r in scale_results.items():
