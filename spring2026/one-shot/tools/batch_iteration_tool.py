@@ -14,7 +14,9 @@ import random
 import sys
 from pathlib import Path
 
-ONE_SHOT_DIR = Path(__file__).resolve().parent
+TOOLS_DIR = Path(__file__).resolve().parent
+ONE_SHOT_DIR = TOOLS_DIR.parent
+sys.path.insert(0, str(TOOLS_DIR))
 sys.path.insert(0, str(ONE_SHOT_DIR))
 sys.path.insert(0, str(ONE_SHOT_DIR.parent))
 
