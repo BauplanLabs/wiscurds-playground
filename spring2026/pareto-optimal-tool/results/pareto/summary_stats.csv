@@ -1,0 +1,5 @@
+group,total_schedulers,functional,functional_pct,pareto_count,best_query_latency_s,best_interactive_latency_s,best_batch_latency_s,max_probe_score,max_completion_rate,top_scheduler
+none,50,19,38%,4,7.2,325.6,253.7,8,0.625,scheduler_none_040
+low,50,28,56%,4,6.7,4.0,114.5,7,0.563,scheduler_low_007
+medium,50,33,66%,3,6.7,4.7,37.8,9,0.813,scheduler_medium_008
+high,50,38,76%,2,6.7,4.1,1156.3,9,1.000,scheduler_high_036

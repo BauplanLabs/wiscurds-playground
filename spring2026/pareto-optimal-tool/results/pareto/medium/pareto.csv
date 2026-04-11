@@ -1,0 +1,4 @@
+filename,adjusted_latency,latency_query_s,latency_interactive_s,latency_batch_s,probe_score,probe_total,completion_rate,probe_syntax,probe_valid_scheduler,probe_basic_run,probe_retry_run,probe_suspend_run,probe_grouping,probe_overcommit,probe_priority_ordering,probe_starvation,probe_no_deadlock
+scheduler_medium_015.py,77.04196750321749,8.608571428571429,8.16,37.785,5,10,0.11267605633802817,1,1,1,0,0,1,1,0,0,0
+scheduler_medium_016.py,636.1955813812262,9.543506493506493,419.45240740740735,159.6357142857143,8,10,0.2802816901408451,1,1,1,1,0,1,1,1,0,1
+scheduler_medium_044.py,1472.769350444026,11.132597402597403,2025.560909090909,2403.9894230769232,9,10,0.2704225352112676,1,1,1,1,0,1,1,1,1,1
