@@ -1,0 +1,5 @@
+filename,adjusted_latency,latency_query_s,latency_interactive_s,latency_batch_s,probe_score,probe_total,completion_rate,probe_syntax,probe_valid_scheduler,probe_basic_run,probe_retry_run,probe_suspend_run,probe_grouping,probe_overcommit,probe_priority_ordering,probe_starvation,probe_no_deadlock
+scheduler_high_013.py,76.1706508210324,7.9321261682243,,,5,10,0.10413625304136254,1,1,1,0,0,1,1,0,0,0
+scheduler_high_045.py,147.94206609837,8.37193925233645,,1479.2669565217395,8,10,0.1097323600973236,1,1,1,1,0,1,1,1,0,1
+scheduler_high_003.py,994.7978473991905,8.94857476635514,1169.4878350515464,,6,10,0.12773722627737227,1,1,1,0,0,1,1,0,1,0
+scheduler_high_044.py,128478.38079999998,9.616,1755.968,,8,10,0.010948905109489052,1,1,1,0,0,1,1,1,1,1

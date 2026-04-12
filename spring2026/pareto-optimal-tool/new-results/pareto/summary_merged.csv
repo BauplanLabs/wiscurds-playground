@@ -1,0 +1,15 @@
+group,filename,latency_query_s,latency_interactive_s,latency_batch_s,probe_score,probe_total,completion_rate,median_latency,highlight
+none,scheduler_none_024.py,7.7,,269.1,7,10,0.106,,
+none,scheduler_none_022.py,9.6,2145.7,,7,10,0.105,,
+none,scheduler_none_041.py,20.5,3035.0,,8,10,0.104,,
+low,scheduler_low_009.py,7.3,3.7,25.5,5,10,0.106,,near-zero interactive
+low,scheduler_low_016.py,8.9,5.4,,6,10,0.104,,near-zero interactive
+low,scheduler_low_042.py,8.9,3.9,162.4,7,10,0.105,,near-zero interactive
+low,scheduler_low_041.py,11.4,619.5,,8,10,0.104,,
+medium,scheduler_medium_006.py,8.2,4.7,472.5,5,10,0.107,,near-zero interactive
+medium,scheduler_medium_008.py,9.4,534.2,,6,10,0.100,,
+medium,scheduler_medium_009.py,20.7,334.9,,9,10,0.100,,top probe score
+high,scheduler_high_013.py,7.9,,,5,10,0.104,,
+high,scheduler_high_045.py,8.4,,1479.3,8,10,0.110,,best probes+query
+high,scheduler_high_003.py,8.9,1169.5,,6,10,0.128,,
+high,scheduler_high_044.py,9.6,1756.0,,8,10,0.011,,
