@@ -1,0 +1,12 @@
+# Raw simulation output is ignored by default. Keep only retained 01/02
+# analysis/probe artifacts that are needed to reproduce the checked-in plots.
+*
+!.gitignore
+!01_reasoning/
+!01_reasoning/**/
+!01_reasoning/**/*.jsonl
+!01_reasoning/**/*.csv
+!02_estimation/
+!02_estimation/**/
+!02_estimation/**/*.jsonl
+!02_estimation/**/*.csv

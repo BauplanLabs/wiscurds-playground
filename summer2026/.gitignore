@@ -1,0 +1,14 @@
+.env
+.venv/
+.uv-cache/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# uv debug logs (regenerate each sync; not needed in repo)
+uv-*.log
+
+# Per-run iteration artifacts can contain prompts/responses and old traces.
+# Keep iterations/README.md tracked, but regenerate run directories locally.
+iterations/*/
