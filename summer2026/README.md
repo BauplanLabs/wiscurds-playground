@@ -9,9 +9,6 @@ uv sync
 Copy-Item .env.example .env   # then set OPENAI_API_KEY
 ```
 
-Do **not** set `UV_CACHE_DIR` to a project-local path - with the `eudoxia` git
-source, that slows `uv run` by ~200x.
-
 ## Step 1: prompt-quality research
 
 **Goal.** Make the prompt rich enough that a senior systems engineer reading it
