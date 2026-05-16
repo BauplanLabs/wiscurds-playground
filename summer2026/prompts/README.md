@@ -1,13 +1,22 @@
-﻿# prompts/
+# prompts/
 
-Editable prompt templates for `tool/iterate.py`.
+Editable prompt inputs for `tool/iterate.py`.
 
-- `system_iterate.md`  -  system prompt template. `{context}` is replaced at runtime with the contents of `context/eudoxia_bauplan.md` (or whichever context file iterate.py is pointed at via `--context`).
-- `context/`  -  eudoxia domain text that fills the `{context}` slot. Edit these to enrich what the LLM knows about the simulator.
-- The user-turn feedback (per-iter perf table + scheduler code + objective) is still built in Python because it depends on simulation data. See `prompts.py:get_iteration_feedback_prompt`.
+- `system_iterate.md`: default system prompt template. `{context}` is replaced
+  at runtime.
+- `system_iterate_ablate_*.md`: ablation variants.
+- `context/`: domain context files, usually `context/eudoxia_bauplan.md`.
+- `../prompts.py`: builds the user prompt from scheduler code and simulator
+  feedback.
 
-## Conventions
+Every run snapshots the rendered prompts and template files under
+`experiments/<experiment>/runs/<N>/iters/<M>/`, so older runs remain
+reproducible after prompt edits.
 
-- Edit `.md` files directly to swap prompts  -  no Python changes needed for the system prompt.
-- Every run of `tool/iterate.py` saves the fully-rendered prompts to `iterations/<run_id>/prompt_system.txt` and `prompt_user.txt`, plus copies of the template files used. So old runs stay reproducible even after you edit a template.
-- Add new variants as new files (`system_iterate_est.md`, `system_iterate_minimal.md`, ...) and select via `--system-prompt`.
+Select variants without Python changes:
+
+```powershell
+uv run python tool/iterate.py --scheduler <scheduler.py> --trace <trace.csv> `
+    --system-prompt prompts/system_iterate.md `
+    --context prompts/context/eudoxia_bauplan.md
+```

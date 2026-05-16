@@ -1,0 +1,20 @@
+{
+  "run_id": "20260514_195138_scheduler_high_006_bench_canonical_train",
+  "created_at": "2026-05-14T19:58:27",
+  "scheduler_in": "schedulers\\reasoning\\high\\scheduler_high_006.py",
+  "trace": "traces\\bench_canonical_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "model": "gpt-5.2-2025-12-11",
+  "effort": "high",
+  "dry_run": false,
+  "system_prompt_template": "C:\\Users\\Gu\\Desktop\\wisc\\wiscurd\\wiscurds-playground\\summer2026\\prompts\\system_iterate.md",
+  "system_prompt_template_sha8": "29b9ad21",
+  "context_path": "C:\\Users\\Gu\\Desktop\\wisc\\wiscurd\\wiscurds-playground\\summer2026\\prompts\\context\\eudoxia_bauplan.md",
+  "context_sha8": "797b7fd5"
+}
