@@ -69,7 +69,19 @@ def main() -> None:
             workload = reader.get_workload(params["ticks_per_second"])
             stats = run_simulator(params, workload=workload)
         weights = {Priority.QUERY: 10, Priority.INTERACTIVE: 5, Priority.BATCH_PIPELINE: 1}
-        latency = stats.adjusted_latency(weights=weights, divide_by_completion_rate=True)
+        # Score uses unfinished_penalty_seconds = 2 * max_job_seconds, matching
+        # what the prompt tells the LLM. Falls back to divide_by_completion_rate
+        # only if the installed eudoxia is too old to support the penalty kw.
+        import inspect
+        max_job_seconds = params.get("max_job_seconds", 0) or 0
+        if max_job_seconds > 0 and "unfinished_penalty_seconds" in inspect.signature(stats.adjusted_latency).parameters:
+            latency = stats.adjusted_latency(
+                weights=weights,
+                divide_by_completion_rate=False,
+                unfinished_penalty_seconds=2 * max_job_seconds,
+            )
+        else:
+            latency = stats.adjusted_latency(weights=weights, divide_by_completion_rate=True)
 
         def _f(v):
             import math

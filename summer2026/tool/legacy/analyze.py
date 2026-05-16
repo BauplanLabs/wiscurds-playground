@@ -2,12 +2,12 @@
 """Analyze retained summer2026 scheduler experiments.
 
 Usage:
-    python tool/legacy/analyze.py 01_reasoning [all|latency|probe]
-    python tool/legacy/analyze.py 02_estimation [all|latency|probe]
+    python tool/legacy/analyze.py oneshot [all|latency|probe]
+    python tool/legacy/analyze.py oneshot-est [all|latency|probe]
     python tool/legacy/analyze.py all [--prototype]
 
-Latency analysis writes analysis.jsonl files under results/.
-Probe analysis writes probes.csv files under results/.
+Latency analysis writes analysis.jsonl under experiments/<exp>/results/.
+Probe analysis writes probes.csv under experiments/<exp>/results/.
 """
 
 from __future__ import annotations
@@ -36,9 +36,9 @@ from simulation_utils import extract_metrics_from_stats, get_raw_stats_for_polic
 from tool.config import (
     ESTIMATOR_CONDITIONS,
     EXPERIMENTS,
+    ONESHOT_DIR,
+    ONESHOT_EST_DIR,
     PROJECT_ROOT,
-    RESULTS_DIR,
-    SCHEDULERS_DIR,
     TRACES_DIR,
     get_canonical_base_params,
 )
@@ -352,16 +352,16 @@ def canonical_trace_setup(prototype: bool) -> tuple[dict, list[str]]:
     return base_params, [str(canonical)]
 
 
-def analyze_01_reasoning(prototype: bool, workers: int, phase: str) -> None:
+def analyze_oneshot(prototype: bool, workers: int, phase: str) -> None:
     base_params, trace_files = canonical_trace_setup(prototype)
 
     for effort in EFFORTS:
-        scheduler_dir = SCHEDULERS_DIR / "reasoning" / effort
+        scheduler_dir = ONESHOT_DIR / "schedulers" / effort
         if not scheduler_files([scheduler_dir]):
             print(f"  SKIP {effort}: no schedulers in {scheduler_dir}")
             continue
 
-        output_dir = RESULTS_DIR / "01_reasoning" / effort
+        output_dir = ONESHOT_DIR / "results" / effort
         if phase in ("all", "probe"):
             print(f"\n--- Probes: {effort} ---")
             probe_params = base_params.copy()
@@ -380,14 +380,14 @@ def analyze_01_reasoning(prototype: bool, workers: int, phase: str) -> None:
             )
 
 
-def analyze_02_estimation(prototype: bool, workers: int, phase: str) -> None:
-    scheduler_dir = SCHEDULERS_DIR / "estimation" / "low"
+def analyze_oneshot_est(prototype: bool, workers: int, phase: str) -> None:
+    scheduler_dir = ONESHOT_EST_DIR / "schedulers" / "low"
     if not scheduler_files([scheduler_dir]):
         print(f"  SKIP: no schedulers in {scheduler_dir}")
         return
 
     base_params, trace_files = canonical_trace_setup(prototype)
-    output_base = RESULTS_DIR / "02_estimation"
+    output_base = ONESHOT_EST_DIR / "results"
     output_effort = output_base / "low"
 
     if phase in ("all", "probe"):
@@ -402,7 +402,7 @@ def analyze_02_estimation(prototype: bool, workers: int, phase: str) -> None:
             output_dir = output_effort / sigma
 
             if sigma == "no_estimation":
-                source = RESULTS_DIR / "01_reasoning" / "low" / "analysis.jsonl"
+                source = ONESHOT_DIR / "results" / "low" / "analysis.jsonl"
                 if source.exists():
                     output_dir.mkdir(parents=True, exist_ok=True)
                     target = output_dir / "analysis.jsonl"
@@ -424,8 +424,8 @@ def analyze_02_estimation(prototype: bool, workers: int, phase: str) -> None:
 
 
 HANDLERS = {
-    "01_reasoning": analyze_01_reasoning,
-    "02_estimation": analyze_02_estimation,
+    "oneshot": analyze_oneshot,
+    "oneshot-est": analyze_oneshot_est,
 }
 
 

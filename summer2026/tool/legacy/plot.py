@@ -2,11 +2,11 @@
 """Generate paper plots for summer2026 experiments.
 
 Usage:
-    python plot.py 01_reasoning
-    python plot.py 02_estimation
+    python plot.py oneshot
+    python plot.py oneshot-est
     python plot.py all
 
-Reads from summer2026/results/{exp_name}/ and writes PDFs to summer2026/plots/.
+Reads from experiments/<exp>/results/ and writes PDFs to experiments/<exp>/plots/.
 """
 
 from __future__ import annotations
@@ -32,6 +32,8 @@ from matplotlib.patches import Patch
 
 from tool.config import (
     EXPERIMENTS,
+    ONESHOT_DIR,
+    ONESHOT_EST_DIR,
     PLOTS_DIR,
     RESULTS_DIR,
     TWO_SHOT_PERF_CONDITIONS,
@@ -171,7 +173,7 @@ def _load_probe_data_01() -> dict[str, dict[str, float]]:
     probes = list(PROBE_LABELS.keys())
     data: dict[str, dict[str, float]] = {}
     for effort in EFFORT_ORDER:
-        path = RESULTS_DIR / "01_reasoning" / effort / "probes.csv"
+        path = ONESHOT_DIR / "results" / effort / "probes.csv"
         if not path.exists():
             continue
         with open(path, newline="") as f:
@@ -190,7 +192,7 @@ def _load_latency_by_effort_01() -> dict[str, np.ndarray]:
     """Load per-scheduler geometric-mean latency from results/01_reasoning/{effort}/analysis.jsonl."""
     result: dict[str, np.ndarray] = {}
     for effort in EFFORT_ORDER:
-        records = load_jsonl(RESULTS_DIR / "01_reasoning" / effort / "analysis.jsonl")
+        records = load_jsonl(ONESHOT_DIR / "results" / effort / "analysis.jsonl")
         vals = []
         for r in records:
             if not r.get("functional"):
@@ -280,12 +282,12 @@ def _load_probe_csv(path: Path) -> dict[str, float]:
 def _load_probe_data_02() -> dict[str, dict[str, float]]:
     """Load probe pass rates for two groups: no_estimates (exp01/low) and with_estimates (exp02)."""
     data: dict[str, dict[str, float]] = {}
-    no_est = _load_probe_csv(RESULTS_DIR / "01_reasoning" / "low" / "probes.csv")
+    no_est = _load_probe_csv(ONESHOT_DIR / "results" / "low" / "probes.csv")
     if no_est:
         data["no_estimates"] = no_est
-    with_est = _load_probe_csv(RESULTS_DIR / "02_estimation" / "probes.csv")
+    with_est = _load_probe_csv(ONESHOT_EST_DIR / "results" / "probes.csv")
     if not with_est:
-        with_est = _load_probe_csv(RESULTS_DIR / "02_estimation" / "low" / "probes.csv")
+        with_est = _load_probe_csv(ONESHOT_EST_DIR / "results" / "low" / "probes.csv")
     if with_est:
         data["with_estimates"] = with_est
     return data
@@ -295,9 +297,9 @@ def _load_latency_by_sigma() -> dict[str, np.ndarray]:
     """Load per-scheduler geometric-mean latency for retained estimation results."""
     result: dict[str, np.ndarray] = {}
     for sigma in SIGMA_ORDER:
-        path = RESULTS_DIR / "02_estimation" / sigma / "analysis.jsonl"
+        path = ONESHOT_EST_DIR / "results" / sigma / "analysis.jsonl"
         if not path.exists():
-            path = RESULTS_DIR / "02_estimation" / "low" / sigma / "analysis.jsonl"
+            path = ONESHOT_EST_DIR / "results" / "low" / sigma / "analysis.jsonl"
         records = load_jsonl(path)
         vals = []
         for r in records:
@@ -479,13 +481,13 @@ def _load_summaries_03() -> dict[str, dict]:
 # Per-experiment plot handlers
 # ---------------------------------------------------------------------------
 
-def plot_01_reasoning() -> None:
+def plot_oneshot() -> None:
     """Fig 1: probe pass rates (left) + latency CDF by reasoning level (right)."""
     probe_data   = _load_probe_data_01()
     latency_data = _load_latency_by_effort_01()
 
     if not probe_data and not latency_data:
-        print("  No results yet for 01_reasoning  -  run analyze.py 01_reasoning first")
+        print("  No results yet for oneshot  -  run analyze.py oneshot first")
         return
 
     fig, (ax_probes, ax_cdf) = plt.subplots(
@@ -504,16 +506,16 @@ def plot_01_reasoning() -> None:
     fig.legend(handles=handles, frameon=False, fontsize=4, ncol=len(present),
                loc="upper center", bbox_to_anchor=(0.5, 1.05))
 
-    _save(fig, PLOTS_DIR / "01_reasoning" / "fig1")
+    _save(fig, ONESHOT_DIR / "plots" / "fig1")
 
 
-def plot_02_estimation() -> None:
+def plot_oneshot_est() -> None:
     """Fig 2: probe pass rates (left) + latency CDF by sigma level (right)."""
     probe_data   = _load_probe_data_02()
     latency_data = _load_latency_by_sigma()
 
     if not probe_data and not latency_data:
-        print("  No results yet for 02_estimation  -  run analyze.py 02_estimation first")
+        print("  No results yet for oneshot-est  -  run analyze.py oneshot-est first")
         return
 
     fig, (ax_probes, ax_cdf) = plt.subplots(
@@ -537,7 +539,7 @@ def plot_02_estimation() -> None:
                ncol=len(all_handles), loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
     fig.tight_layout(rect=[0, 0, 1, 0.84])
-    _save(fig, PLOTS_DIR / "02_estimation" / "fig2")
+    _save(fig, ONESHOT_EST_DIR / "plots" / "fig2")
 
 
 def plot_03_two_iter_best_worst() -> None:
@@ -934,8 +936,8 @@ def plot_09_general_purpose() -> None:
 
 
 PLOT_HANDLERS = {
-    "01_reasoning":           plot_01_reasoning,
-    "02_estimation":          plot_02_estimation,
+    "oneshot":      plot_oneshot,
+    "oneshot-est":  plot_oneshot_est,
 }
 
 
@@ -968,7 +970,7 @@ def main() -> None:
             kwargs["context"] = args.context
         handler(**kwargs)
 
-    print(f"\nDONE. PDFs in {PLOTS_DIR}/")
+    print("\nDONE. PDFs written under each experiment's plots/ dir.")
 
 
 if __name__ == "__main__":

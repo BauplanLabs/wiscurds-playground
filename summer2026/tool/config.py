@@ -7,9 +7,17 @@ from pathlib import Path
 
 SUMMER2026_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SUMMER2026_DIR
-TRACES_DIR = SUMMER2026_DIR / "traces"
+TRACES_DIR = SUMMER2026_DIR / "scenarios" / "traces" / "v1"
+RESULTS_DIR = SUMMER2026_DIR / "results"   # tool/probe writes results/probes/ here
+
+# Each experiment owns its own schedulers/ + results/ + plots/ subtree.
+EXPERIMENTS_DIR = SUMMER2026_DIR / "experiments"
+ONESHOT_DIR = EXPERIMENTS_DIR / "oneshot"          # was schedulers/reasoning + results/01_reasoning
+ONESHOT_EST_DIR = EXPERIMENTS_DIR / "oneshot-est"  # was schedulers/estimation + results/02_estimation
+
+# Legacy 03-09 pipeline roots (dormant: no data on disk; kept so tool/legacy
+# imports resolve and those branches degrade gracefully to "no results").
 SCHEDULERS_DIR = SUMMER2026_DIR / "schedulers"
-RESULTS_DIR = SUMMER2026_DIR / "results"
 PLOTS_DIR = SUMMER2026_DIR / "plots"
 
 # ---------------------------------------------------------------------------
@@ -17,8 +25,8 @@ PLOTS_DIR = SUMMER2026_DIR / "plots"
 # ---------------------------------------------------------------------------
 
 EXPERIMENTS = {
-    "01_reasoning":           "Fig 1  -  one-shot, vary reasoning level (no estimation)",
-    "02_estimation":          "Fig 2  -  one-shot, vary estimation noise (medium reasoning)",
+    "oneshot":      "Fig 1  -  one-shot, vary reasoning level (no estimation)",
+    "oneshot-est":  "Fig 2  -  one-shot, vary estimation noise (medium reasoning)",
 }
 
 # ---------------------------------------------------------------------------
@@ -40,7 +48,9 @@ CANONICAL_SIM_PARAMS = {
     "batch_prob": 0.6,
     "random_seed": 42,
     "per_trace_timeout": None,
-    "subprocess_timeout": 600,   # 10-min wall clock safety net per scheduler
+    "subprocess_timeout": 180,   # 3-min wall clock per single sim (per scale).
+                                  # Historical max for functional schedulers in 01/02 was 119s/sim,
+                                  # so 180s gives ~1.5x headroom while killing infinite loops fast.
     # Max job time = 6 minutes (eudoxia param name: max_job_seconds)
     "max_job_seconds": 360,
 }
