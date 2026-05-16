@@ -196,11 +196,14 @@ def get_iteration_feedback_prompt(
     scheduler_code: str,
     scale_results: dict,
     base_params: dict,
+    workload_summary: str | None = None,
 ) -> str:
     """Build the user-turn feedback prompt for one iteration of LLM improvement.
 
     Combines the weighted-latency objective function with the performance table
-    from the current scheduler run. Handles the all-failed case separately.
+    from the current scheduler run. Optionally prepends a workload summary
+    (markdown produced by tool/trace_summary.py). Handles the all-failed case
+    separately.
     """
     import math
 
@@ -258,11 +261,51 @@ def get_iteration_feedback_prompt(
     n_valid = len(valid_latencies)
     n_total = len(scale_results)
 
+    workload_block = f"{workload_summary}\n\n" if workload_summary else ""
+
     if valid_latencies:
         gm = math.exp(sum(math.log(max(v, 1e-12)) for v in valid_latencies) / len(valid_latencies))
         geomean_line = f"Geometric mean across {n_valid}/{n_total} successful runs: {gm:.4f}s"
+
+        # Mixed case: some scales succeed, some fail. The observed failure mode
+        # is the LLM discarding the working aggressive core and retreating to a
+        # degenerate query-only policy that passes 5/5 but scores no better than
+        # a do-nothing baseline. Anchor the model on what already worked.
+        preserve_block = ""
+        n_failed = n_total - n_valid
+        if 0 < n_failed < n_total:
+            ok_scale_ids = [s for s in sorted(scale_results) if scale_results[s].get("ok")]
+            bad_scale_ids = [s for s in sorted(scale_results) if not scale_results[s].get("ok")]
+            best_scale = min(ok_scale_ids, key=lambda s: scale_results[s]["latency"])
+            br = scale_results[best_scale]
+            strong = []
+            for prio in ("query", "interactive", "batch"):
+                ps = br.get(prio)
+                if ps and ps["arrived"] > 0 and ps["completed"] / ps["arrived"] >= 0.9:
+                    strong.append(f"{prio} {ps['completed']}/{ps['arrived']}")
+            strong_s = "; ".join(strong) if strong else "low adjusted latency"
+            ok_s = ", ".join(f"{s}x" for s in ok_scale_ids)
+            bad_s = ", ".join(f"{s}x" for s in bad_scale_ids)
+            preserve_block = f"""## What already works  -  PRESERVE THIS
+
+Scales {ok_s} already run successfully; the best is {best_scale}x at \
+{br['latency']:.2f}s with {strong_s}. This proves the core allocation and
+scheduling logic in the code below is sound and competitive  -  it is not the
+problem.
+
+ONLY scales {bad_s} failed, and they failed with a *specific structural* error
+(see the FAILED line above), not because the working scales' strategy is wrong.
+
+Make the SMALLEST change that fixes only the failing scales. Do NOT rewrite
+from scratch, and do NOT retreat to an ultra-conservative policy (e.g. running
+only query and starving interactive/batch) just to make every scale "pass": a
+scheduler that passes 5/5 but completes only query scores NO BETTER than a
+do-nothing baseline (~485s here). Keep the behaviour that produced the good
+{ok_s} numbers above; surgically fix what broke at {bad_s}.
+
+"""
         return f"""\
-## Objective Function
+{workload_block}## Objective Function
 
 For each pipeline, assign a latency value:
   - Completed pipeline: actual end-to-end latency in seconds
@@ -281,7 +324,7 @@ High completion rate matters as much as low latency.
 
 {geomean_line}
 
-## Current Scheduler Code
+{preserve_block}## Current Scheduler Code
 
 {scheduler_code}
 
@@ -294,7 +337,7 @@ Output ONLY the complete Python code."""
     unique_errors = list(dict.fromkeys(errors))
     error_list = "\n".join(f"  {e}" for e in unique_errors)
     return f"""\
-!! ALL {n_total} RUNS FAILED  -  STRUCTURAL ERRORS MUST BE FIXED BEFORE OPTIMIZING !!
+{workload_block}!! ALL {n_total} RUNS FAILED  -  STRUCTURAL ERRORS MUST BE FIXED BEFORE OPTIMIZING !!
 
 ## Errors (deduplicated)
 
@@ -334,3 +377,73 @@ Critical API facts:
 {scheduler_code}
 
 Rewrite this scheduler so it runs without errors. Use the EXACT key "{policy_key}" in both @register_scheduler_init and @register_scheduler decorators. Output ONLY the complete Python code."""
+
+
+def get_multi_candidate_feedback_prompt(
+    policy_key: str,
+    candidates: list[dict],
+    base_params: dict,
+    workload_summary: str | None = None,
+) -> str:
+    """Feedback prompt that shows several prior chain attempts at once.
+
+    candidates: list of {"label": str, "scheduler_code": str, "scale_results": dict}.
+    Used by the chained driver for the `lastn-1` and `best-k` selection policies.
+    Each candidate is summarized compactly (one line per scale + full code) so
+    K candidates stay within a reasonable prompt size.
+    """
+    import math
+
+    def _gm(vals: list[float]) -> float:
+        return math.exp(sum(math.log(max(v, 1e-12)) for v in vals) / len(vals)) if vals else float("nan")
+
+    workload_block = f"{workload_summary}\n\n" if workload_summary else ""
+
+    blocks = []
+    for c in candidates:
+        sr = c["scale_results"]
+        valid = [r["latency"] for r in sr.values() if r.get("ok")]
+        gm = _gm(valid)
+        gm_s = f"{gm:.1f}s" if valid else "n/a"
+        lines = []
+        for scale in sorted(sr):
+            r = sr[scale]
+            if r.get("ok"):
+                fec = r.get("failure_error_counts") or {}
+                fec_s = " ".join(f"{k}={v}" for k, v in sorted(fec.items())) or "clean"
+                lines.append(f"  {scale}x adj={r['latency']:.1f}s [{fec_s}]")
+            else:
+                lines.append(f"  {scale}x FAILED: {r.get('error', '?')}")
+        blocks.append(
+            f"### {c['label']} - geomean {gm_s} ({len(valid)}/{len(sr)} scales ok)\n"
+            + "\n".join(lines)
+            + f"\n\n```python\n{c['scheduler_code']}\n```"
+        )
+
+    candidates_text = "\n\n".join(blocks)
+    return f"""\
+{workload_block}## Objective Function
+
+For each pipeline, assign a latency value:
+  - Completed pipeline: actual end-to-end latency in seconds
+  - Incomplete or failed pipeline: 2 x max_job_seconds (e.g. 720s if max_job_seconds=360)
+
+These per-pipeline latencies are combined into a priority-weighted average:
+  score = (sum query_latency x 10 + sum interactive_latency x 5 + sum batch_latency x 1)
+        / (query_arrivals x 10 + interactive_arrivals x 5 + batch_arrivals x 1)
+
+Incomplete and failed pipelines inflate the score through the penalty term.
+
+## Prior attempts in this chain (study what worked and what failed)
+
+{candidates_text}
+
+## Task
+
+Produce a single improved scheduler. Diagnose the specific failures shown
+above (e.g. Overallocated, subprocess timeout, re-assigning non-assignable
+operators) and fix them while keeping what worked. Lower the priority-weighted
+geometric-mean latency and complete all 5 cluster scales.
+
+Use the EXACT key "{policy_key}" in both @register_scheduler_init and
+@register_scheduler decorators. Output ONLY the complete Python code."""

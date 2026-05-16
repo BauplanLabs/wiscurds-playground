@@ -1,91 +1,98 @@
 # summer2026
 
-LLM scheduler experiments on Eudoxia. Target: **NOVAS Workshop 2026-06-13**.
+Self-contained LLM scheduler experiments on Eudoxia for the NOVAS 2026 work.
 
 ## Setup
 
 ```powershell
 uv sync
-Copy-Item .env.example .env   # then set OPENAI_API_KEY
+Copy-Item .env.example .env   # set OPENAI_API_KEY for real LLM runs
 ```
 
-Do **not** set `UV_CACHE_DIR` to a project-local path - with the `eudoxia` git
-source, that slows `uv run` by ~200x.
+Run commands from this directory. Do not set `UV_CACHE_DIR` inside the project;
+the `eudoxia` git dependency becomes much slower with a local uv cache.
 
-## Step 1: prompt-quality research
+## Structure
 
-**Goal.** Make the prompt rich enough that a senior systems engineer reading it
-could articulate 3-5 specific scheduler-improvement directions. Until that bar
-is met, we are testing "LLM with a blindfold," not "LLM as scheduler designer."
+| Path | Purpose |
+|---|---|
+| `tool/iterate.py` | Main single-iteration entry point. Also exposes `evaluate`, `genprompt`, `gensched`, and `nextiter` subcommands. |
+| `tool/iterate_chain.py` | Multi-round improvement loop over one experiment name. |
+| `tool/legacy/` | Kept-runnable scripts for the old 01/02 experiments. |
+| `tool/probe/` | Scheduler validity and behavior probes. |
+| `prompts/` | Editable system prompt templates and domain context. |
+| `scenarios/` | Scenario registry, params, and workload traces. |
+| `experiments/` | Tracked curated results plus gitignored generated runs. |
+| `llm.py`, `prompts.py`, `simulation_utils.py` | Shared LLM, prompt-building, and Eudoxia adapter code. |
 
-**Unit of work.** One `tool/iterate.py` invocation. Each call is independent -
-no chain, no history. Compare runs by inspecting their artifacts side by side.
+Generated run artifacts live under:
 
-**Loop.**
-
-```
-1. Run iterate.py on any scheduler  (dry-run = free, real = LLM cost)
-2. Open iterations/<run_id>/ - read prompt_system.txt + prompt_user.txt
-3. Apply the "senior eng" test on those two files
-4. If the prompt is thin, edit ONE lever:
-     - prompts/context/eudoxia_bauplan.md  (domain knowledge)
-     - prompts/system_iterate.md           (API ref / output rules)
-     - prompts.py:get_iteration_feedback_prompt  (perf table / diagnostics)
-5. Re-run. Compare new vs. old iterations/<run_id>/.
+```text
+experiments/<experiment>/runs/<N>/iters/<M>/
 ```
 
-**Commands.**
+`<experiment>` is a human-readable research question or study name. The current
+single-iteration default is `prompt-quality`. The old `--exp` flag still works,
+but new commands should use `--experiment`.
+
+## Current Workflow
+
+Dry-run a prompt and artifact write without calling the LLM or simulator:
 
 ```powershell
-# Free dry-run - composes real prompts, skips LLM & simulator
 uv run python tool/iterate.py `
-    --scheduler schedulers/reasoning/low/scheduler_low_001.py `
-    --trace traces/bench_canonical_train.csv --dry-run
-
-# Real run - runs simulator across 5 scales + 1 LLM call
-uv run python tool/iterate.py --scheduler <path.py> --trace <trace.csv>
-
-# Swap prompt files without editing Python
-uv run python tool/iterate.py --scheduler <path.py> --trace <trace.csv> `
-    --system-prompt prompts/system_iterate.md `
-    --context prompts/context/eudoxia_bauplan.md
+    --experiment prompt-quality `
+    --scheduler experiments/oneshot/schedulers/low/scheduler_low_001.py `
+    --trace scenarios/traces/v1/bench_canonical_train.csv `
+    --dry-run
 ```
 
-**Each run writes to `iterations/<run_id>/`:**
+Run one real LLM improvement iteration:
 
-| File | What it is |
+```powershell
+uv run python tool/iterate.py `
+    --experiment prompt-quality `
+    --scheduler <scheduler.py> `
+    --trace <trace.csv>
+```
+
+Each iteration writes:
+
+| File | Meaning |
 |---|---|
-| `prompt_system.txt` / `prompt_user.txt` | Final rendered prompts sent to LLM |
-| `*.template.md` | Copies of the template files used (for reproducibility) |
-| `scheduler_in.py` / `scheduler_out.py` | Input and improved scheduler |
-| `response_raw.txt` | Raw LLM output before code extraction |
-| `eval_in.json` | Per-scale simulator results: latency, OOM count, mem util, per-priority |
-| `meta.json` | Model, effort, template SHAs, timestamps |
+| `prompt_system.txt`, `prompt_user.txt` | Rendered prompts sent to the model. |
+| `*.template.md` | Prompt/context template snapshots. |
+| `scheduler_in.py`, `scheduler_out.py` | Input scheduler and generated scheduler. |
+| `response_raw.txt` | Raw LLM response before code extraction. |
+| `eval_in.json`, `eval_out.json` | Simulator results before and after the generated scheduler. |
+| `meta.json` | Model, effort, prompt hashes, timestamps, and run metadata. |
 
-**Exit Step 1 when** the prompts pass the "senior eng" test on multiple runs
-*and* `scheduler_out.py` changes look targeted at signals in the prompt.
+## Step API
 
-## Layout
+For manual or chained workflows, the same iteration can be split into separate
+steps that share one `--output-dir`:
 
-| Dir | Role |
-|---|---|
-| `prompts/` | Editable prompt templates (`system_iterate.md`) + `context/` domain markdown |
-| `iterations/` | Canonical per-run artifacts from `tool/iterate.py` |
-| `scenarios/` | `scenarios.csv` registry + `params/` simulator TOMLs |
-| `schedulers/` | Retained 01/02 input schedulers: `reasoning/` and `estimation/`. |
-| `traces/`, `traces-v2/` | Workload CSVs |
-| `tool/` | `iterate.py`, `iterate_worker.py`, `config.py`, `_mock/`, `probe/`, `legacy/` |
-| `results/`, `plots/` | 01/02 analysis outputs and paper figures |
+```powershell
+uv run python tool/iterate.py evaluate  --output-dir experiments/E/r0 `
+    --scheduler <seed.py> --trace <trace.csv>
+uv run python tool/iterate.py genprompt --output-dir experiments/E/r1 `
+    --input-dirs experiments/E/r0 --trace <trace.csv>
+uv run python tool/iterate.py gensched  --output-dir experiments/E/r1
+uv run python tool/iterate.py evaluate  --output-dir experiments/E/r1 `
+    --trace <trace.csv>
+```
 
-Current canonical test trace: `traces/bench_canonical_train.csv`.
+`nextiter` runs `genprompt`, `gensched`, and `evaluate` in one command.
 
-## Legacy 01/02 experiments
+## Legacy 01/02
 
-Preserved under `tool/legacy/`, not on the current path:
+The preserved one-shot collections are under `experiments/oneshot/` and
+`experiments/oneshot-est/`. Legacy scripts still use their original option
+names:
 
 ```powershell
 uv run python tool/legacy/generate.py --exp reasoning --effort low --n 50
-uv run python tool/legacy/analyze.py 01_reasoning
-uv run python tool/legacy/plot.py 01_reasoning
-uv run python tool/probe/run_probes.py schedulers/reasoning/low
+uv run python tool/legacy/analyze.py oneshot
+uv run python tool/legacy/plot.py oneshot
+uv run python tool/probe/run_probes.py experiments/oneshot/schedulers/low
 ```

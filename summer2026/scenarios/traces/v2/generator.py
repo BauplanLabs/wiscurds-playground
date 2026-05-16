@@ -19,7 +19,7 @@ from itertools import product
 from pathlib import Path
 
 TRACES_DIR = Path(__file__).resolve().parent
-SUMMER2026_DIR = TRACES_DIR.parent
+SUMMER2026_DIR = TRACES_DIR.parents[2]  # scenarios/traces/v2 -> summer2026
 sys.path.insert(0, str(SUMMER2026_DIR / "tool"))
 
 from trace_generator import (

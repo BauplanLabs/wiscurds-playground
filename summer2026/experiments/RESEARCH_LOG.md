@@ -1,4 +1,4 @@
-# iterations
+# Research Log
 
 This directory stores one artifact bundle per `tool/iterate.py` invocation.
 Each subdirectory is intentionally self-contained so a run can be inspected,
@@ -26,7 +26,7 @@ Example:
 The current canonical test trace is:
 
 ```text
-traces/bench_canonical_train.csv
+scenarios/traces/v1/bench_canonical_train.csv
 ```
 
 ## Files in each run
@@ -39,22 +39,24 @@ traces/bench_canonical_train.csv
 | `prompt_user.txt` | Final user prompt sent to the LLM: input scheduler evaluation plus improvement request. |
 | `response_raw.txt` | Raw LLM response before code-fence stripping. |
 | `eval_in.json` | Evaluation results for `scheduler_in.py` across the requested cluster scales. |
+| `eval_out.json` | Evaluation results for `scheduler_out.py` across the same scales (real runs only; absent on `--dry-run`). |
 | `system_iterate.template.md` | Copy of the system prompt template used for this run. |
 | `context.template.md` | Copy of the context markdown used for this run. |
-| `meta.json` | Run metadata: input paths, model, effort, prompt/template hashes, timestamp, dry-run flag. |
+| `meta.json` | Run metadata: input paths, model, effort, prompt/template hashes, timestamp, dry-run flag, `has_eval_out`. |
 
 ## Current semantics
 
-`tool/iterate.py` currently evaluates only the input scheduler before building
-the prompt:
+`tool/iterate.py` runs:
 
 ```text
-evaluate scheduler_in.py -> build prompt -> generate scheduler_out.py
+evaluate scheduler_in -> build prompt -> LLM -> save scheduler_out
+                                              -> evaluate scheduler_out
+                                              -> print in/out comparison
 ```
 
-It does not automatically evaluate `scheduler_out.py` yet. To decide whether a
-generated scheduler is actually better, run a follow-up evaluation or use the
-generated scheduler as the `--scheduler` input for another iteration.
+The auto-evaluation of `scheduler_out.py` runs on the same trace + scales as
+`scheduler_in.py`, so each run dir is a self-contained before/after experiment.
+Dry-run skips both the LLM call and the output evaluation.
 
 ## How to inspect a run
 
@@ -81,10 +83,202 @@ suggest targeted scheduler improvements.
 
 Real runs only. Plumbing-test / dry-run dirs are deleted, not logged here.
 
-| Date | Run id | Stage | Prompt variant | scheduler_in | in geomean | scheduler_out eval | Verdict |
-|---|---|---|---|---|---|---|---|
-| 2026-05-14 | `193919_*_high_006_*` | A | baseline | high_006 | 104.2s | regressed: 1x OOM=17838; 4x/8x Overallocated; 16x timeout | LLM produced "share caps + aggressive alloc" - confidently broke things |
-| 2026-05-14 | `195138_*_high_006_*` | B V1 | A + failure types + memory util + throughput counts | high_006 | 104.2s | regressed: all scales subprocess-timeout (>10 min) | LLM produced "near-minimum alloc + safetyx1.2" - different design but still bad |
+**Score formula change at Stage B-2.** Runs before B-2 (Stage A, B V1) used the
+old `divide_by_completion_rate=True` formula in `iterate_worker.py`, which
+silently downweighted priority classes with 0% completion. `in_geomean` numbers
+from those runs are NOT comparable to Stage B-2+ runs that use the correct
+`unfinished_penalty_seconds = 2 * max_job_seconds` formula matching the prompt.
+Stage A's input scheduler reports 104s under the old formula but 485s under the
+correct one — same scheduler, same trace, ~4.6x difference.
+
+| Date | Run id | Stage | Prompt variant | Score formula | in geomean | out geomean | delta | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 2026-05-14 | `193919_*_high_006_*` | A | baseline | old (div-by-completion) | 104.2s | n/a | n/a | output regressed: 1x OOM=17838; 4x/8x Overallocated |
+| 2026-05-14 | `195138_*_high_006_*` | B V1 | A + failure types + memory util + throughput counts | old | 104.2s | n/a | n/a | output regressed: all scales subprocess-timeout |
+| 2026-05-15 | `095542_*_high_006_*` | B-2/B-3 | V1 + Hard Constraints (API contract + OOM retry depth) | new (720s penalty) | 485.4s | 573.4s | +18.1% (WORSE) | output runs 1x/2x/4x cleanly (no Overallocated!), but 8x/16x timeout; OOMs jumped from 2 -> 38 (LLM overcorrected to too-aggressive low-RAM alloc) |
+| 2026-05-15 | `111840_*_high_006_*` | B-7 | + Objective Intuition (priority weights = pipeline impact) | new | 485.4s | 540.8s | +11.4% (WORSE) | LLM internalized "protect query first" (query 0.7% -> 76% at 4x) but went too low on RAM -> 36k+ OOMs; 4x BEAT input -8.3% but 8x/16x timeout |
+| 2026-05-15 | `120457_*_high_006_*` | B-4 v1 | + workload summary (storage_read=37GB hint) | new | 485.4s | nan | timeout x5 | LLM tried `op.storage_read_gb` but Operator does not expose it (it lives on op.values[i] Segment); summary misled |
+| 2026-05-15 | `124555_*_high_006_*` | B-4 v2 | + Segment API in API ref (`seg.get_peak_memory_gb()` etc.) | new | 485.4s | nan | timeout x5 | LLM USED the new API (peak_ram = max seg.get_peak_memory_gb()) and bounded retries, but wrote a 683-line scheduler with max_new_assignments_per_tick=600 -> per-tick work blew up |
+| 2026-05-15 | `132010_*_high_006_*` | **B-8 ORACLE** | + Per-tick performance budget; includes `seg.get_peak_memory_gb()` oracle | new + ORACLE | 485.4s | **70.74s** | **-85.4% (BETTER, 5/5)** | Upper-bound data point only. All 5 scales complete; LLM used ground-truth peak RAM plus bounded retries and capped scans. Not a fair realistic-memory result. |
+| 2026-05-15 | `152045_*_high_006_*` | B-8 ORACLE replicate | identical oracle B-8 prompt, fresh LLM draw, temp=1.0 | new + ORACLE | 485.4s | **63.51s** | **-86.9% (BETTER, 5/5)** | Oracle win replicates, but remains upper-bound because prompt exposed true memory. |
+| 2026-05-15 | `160015_*_high_045_*` | B-8 ORACLE generalize | oracle B-8 prompt, **different input** (scheduler_high_045 = worst high-effort) | new + ORACLE | 486.3s | **88.82s** | **-81.7% (BETTER, 5/5)** | Oracle-tainted input-generalization run. Useful upper-bound, not fair headline evidence. |
+| 2026-05-15 | `163651_*_high_021_*` | B-8 ORACLE generalize-2 | oracle B-8 prompt, input = scheduler_high_021 (01/02-labelled "best" high-effort) | new + ORACLE | 483.7s | **69.59s** | **-85.6% (BETTER, 5/5)** | Oracle-tainted. Also reveals 01/02 ranking was a metric artifact under the corrected 720s-penalty formula. |
+| 2026-05-15 | `165441_*_high_006_*` | **fair-B-8** | B-8 minus memory oracle (no get_peak_memory_gb, no storage→RAM hint); OOM-discovery only | new, FAIR | 485.4s | **128.77s** | **-73.5% (BETTER, 5/5)** | **The validity-clean headline result.** Win holds without oracle: 5/5, -73.5%. Oracle was worth ~13pp + OOM elimination. Bulk of gain is structural, not clairvoyance. 16x near-optimal (27.8s), 1x pays OOM-discovery tax (431s). Input verified oracle-free too → fair comparison. |
+| 2026-05-15 | `172031_*_high_006_*` | Phase1 fair-B-8 replicate | default fair prompt (`system_iterate.md` sha `3489eafa`) | new, FAIR | 485.4s | n/a | WORSE, 0/5 | **Phase 1 stop condition hit.** Fresh sample regressed structurally: all scales failed with `Cannot transition operator ... from running/completed to assigned`, i.e. output re-assigned non-assignable operators. Do not proceed to ablations/generalization until fair-B-8 variance or prompt constraint is understood. |
+
+### ⚠️ Key finding: single-shot fair output is high-variance (2026-05-15)
+
+Four fair-condition samples, SAME input (high_006 + bench_canonical, fair
+prompt, no oracle), temperature=1.0:
+
+| run | prompt | scales ok | dominant failure |
+|---|---|---|---|
+| `165441` | fair-B-8 | 5/5 (-73.5%) | none |
+| `172031` | fair-B-8 | 0/5 | stale-queue re-assign |
+| `173934` | fair-B-9 (+HC#5) | 3/5 (-83.9%) | Overallocated RAM (HC#1/#2) |
+| `175014` | fair-B-9 (+HC#5) | 1/5 (-87.9%) | per-tick timeout (HC#4) |
+
+Mean ≈ 2.25/5 scales pass; only 1/4 fully valid. Each draw violates a
+*different* one of the 5 enumerated hard constraints, even though all 5 are in
+the prompt and each is individually understood. Adding HC#5 removed the
+stale-queue mode but did not raise reliability — a new mode surfaced instead.
+**Conclusion: prompt enrichment lowers and shifts the error distribution but
+cannot make single-shot generation of a ~500-line stateful scheduler jointly
+satisfy all invariants reliably. The residual is irreducible single-sample
+variance, not a comprehension gap.** Controllable levers: (a) iterative error
+feedback, (b) best-of-N selection — both convert an unreliable single sample
+into a reliable pipeline at multi-round / N× cost. Iteration-as-cure tested next.
+
+### ⚠️ Key finding: iteration cures structural bugs but regresses performance (Chain B, 2026-05-15)
+
+Chain `cure-overalloc`, `--select last --stop-on 5of5`, input =
+`20260515_173934_*` (fair-B-9 sample: 3/5, but 8x/16x EXCELLENT — adj 34.3s/32.1s
+with batch ~2380/2413 completed; only 2x/4x crashed `Overallocated`).
+
+Round 1 output: **5/5 scales pass, geomean 486.58s** — i.e. NO improvement over
+the ~485s do-nothing baseline. Per-scale eval_out: every scale ~486s, query
+425-428/430, **interactive 0/1267, batch 0/2413 at ALL scales**, OOM ~5000/scale.
+
+So iteration *did* reliably remove the structural `Overallocated` crash in one
+round — but the LLM achieved 5/5 by **discarding the working aggressive core**
+(which had produced 32s + 99% batch at 8x/16x) and **retreating to a degenerate
+query-only policy that starves interactive/batch entirely**. The "cure" threw
+away the performance gain.
+
+**Conclusion: under failure-only feedback, correctness and performance are in
+tension. Telling the LLM "you crashed at 2x/4x" makes it abandon aggression
+wholesale rather than surgically fix the specific bug while keeping the good
+8x/16x behaviour. `--stop-on 5of5` is the wrong stop condition — 5/5 is
+necessary but not sufficient; we celebrated a valid-but-useless scheduler.**
+
+Fix applied: `prompts.py:get_iteration_feedback_prompt` now emits a "What
+already works — PRESERVE THIS" block in the mixed (some-pass-some-fail) case,
+naming the strong scales/priorities and forbidding the degenerate-safe
+retreat. Re-running chain B with this feedback + no `--stop-on 5of5` (push for
+performance, not just validity) is the next experiment.
+
+### ✅ Key finding: preserve-feedback converts the degenerate cure into a real one (chain `cure-overalloc-preserve`, 2026-05-15)
+
+Same input (`173934`, 3/5), same `--select last`, **only difference: the new
+"PRESERVE THIS" block + `--stop-on none` (4 fixed rounds).**
+
+| round | geomean | scales | character |
+|---|---|---|---|
+| 1 | **180.55s** | **5/5** | **GENUINE cure** — 8x 31.3s (Q428/I1258/B2383), 16x 26.9s (Q428/I1258/B2388); aggressive core PRESERVED. Small scales 1x/2x/4x pay heavy OOM-discovery tax (575-649s) but no crash. |
+| 2 | 364.73s | 5/5 | regressed (still valid, ~2x worse) |
+| 3 | 418.84s | 3/5 | regressed, lost 2 scales |
+| 4 | 223.14s | 1/5 | mostly broken |
+
+**Direct causal result (publishable):** holding input/selection/everything else
+fixed, adding the preserve block flipped chain-B round-1 from a degenerate
+**486s, 5/5, query-only (I=0, B=0 everywhere)** into a genuine **180.55s, 5/5
+with 8x/16x batch ~99% completed** — a -63% improvement and a real win, not a
+do-nothing baseline in disguise. Feedback that anchors the model on "what
+already worked" *resolves* the correctness/performance tension that
+failure-only feedback creates.
+
+**Second, opposite methodology lesson:** under `--select last`, iterating
+*past* a good 5/5 round DESTROYS it (180→365→419→223, losing scales). Old
+chain B's bug was `--stop-on 5of5` stopping too early at a *bad* 5/5; here the
+bug is *not stopping* and feeding a *good* 5/5 back to "improve", which makes
+the LLM perturb a working solution. Correct policy needs BOTH: (a)
+preserve-feedback so the 5/5 you reach is good, AND (b) a selection/stop that
+does not discard a good round — `--select best` (always iterate from
+best-so-far) or stop on "5/5 AND geomean < input". Next experiment:
+`cure-overalloc-preserve` input, `--select best`, to test whether iterating
+from round-1's 180s can push toward the fair-B-8 single-shot best (128.77s)
+without losing the good scales.
+
+### ⚠️ Key finding: the chain selector itself had a "reward giving up" bug (chain `cure-overalloc-best`, 2026-05-16)
+
+Ran the `--select best` experiment (same input, preserve feedback, 4 rounds).
+Per-round, per-scale truth:
+
+| round | scales | what it actually did |
+|---|---|---|
+| 1 | 3/5 | 1x 435s, 2x/4x `Overallocated`, 8x 34s (B 2379), 16x 32s (B 2383) — a fresh draw that re-cloned the input (single-shot variance again) |
+| 2 | **5/5** | **1x 429 → 2x 231 → 4x 145 → 8x 33 (B 2386) → 16x 31 (B 2386); all classes served, no degenerate starvation — the genuine best of the whole study at full validity** |
+| 3 | 2/5 | 1x/2x/4x subprocess timeout; only 8x/16x |
+| 4 | 1/5 | only 16x |
+
+The driver's `--select best` used `_valid_geomean` = geomean over **only the
+OK scales**, silently dropping failed scales. So a 3/5 run averaging just its
+easy scales scored 78s while the correct 5/5 round-2 scored 108s — the tool
+ranked the incomplete run *higher*. `--select best` therefore **discarded the
+5/5 round-2** at round 3 and chased fail-heavy rounds, ending its "best" at a
+**1/5, 16x-only, 26.9s** scheduler. This is the *same bug class* as the
+original `divide_by_completion_rate` latency bug — silently ignoring failures
+makes a crippled solution look optimal — but relocated into the **chain
+selector**. Left unfixed, every multi-round selection policy optimises a
+metric that *rewards abandoning hard scales*.
+
+**Fix:** `iterate_chain.py:_valid_geomean` → `_chain_score(scale_results,
+penalty_s)`: a failed scale now contributes `2 * max_job_seconds` (720s) and
+the geomean is taken over **all** requested scales, exactly matching the real
+objective. `--select best` / `best-k` rank on this; a more-complete round now
+always beats a fail-heavy one.
+
+**Fix verified (`cure-overalloc-best2`, 2026-05-16).** Re-ran the same config
+with the corrected selector. Per-round: r1 1/5 (score 381), r2 2/5 (201), r3
+2/5 (201), r4 1/5 (378). `--select best` correctly kept the 2/5 round over the
+1/5 rounds and did NOT chase a fail-heavy run below a more-complete one — the
+"reward giving up" behaviour is gone. But this chain's draws were all poor:
+*no round produced a 5/5*. Every round nailed an essentially-optimal 16x
+(28-30s, Q428/I1257/B2387) — and 8x too from r2 on — but failed 1x/2x/4x with
+a *rotating* error (Overallocated → subprocess timeout → an `int('p4')` pool-id
+parse bug the LLM introduced in r4). Same signature as the single-shot
+variance finding, now concentrated at the resource-tight small scales.
+
+**Cross-chain comparison (3 identical-config runs: same 3/5 input, preserve
+feedback, fresh draws):** round-1 ∈ {5/5@180s, 3/5, 1/5@381s}; best round ever
+∈ {5/5@180 (`preserve`), 5/5@108 (`best` r2), 2/5@201 (`best2`)}.
+
+**Conclusion: with the selector fixed, `--select best` is sound but it is a
+ratchet, not a generator — it can only preserve the best sample a chain
+happens to draw. Single-width chain depth inherits a fresh high-variance draw
+every round and cannot rescue an unlucky chain. The reliability lever that
+matters is sampling WIDTH per round (best-of-N), not chain DEPTH at width 1.**
+Recommended next: best-of-N per round (sample K candidates, keep best by
+`_chain_score`), not deeper single-width chains.
+
+### Key finding: width beats depth for the overalloc repair (chain `cure-overalloc-bestofn`, 2026-05-16)
+
+Implemented `tool/iterate_chain.py --width K`: each round samples K schedulers
+from the same prompt, evaluates all K, and keeps the best by `_chain_score`.
+Ran K=5, one round, three independent runs from the same historical 3/5
+overalloc input used by the `cure-overalloc*` chains.
+
+| run | candidate scores | selected | scales | selected geomean |
+|---|---|---:|---:|---:|
+| 1 | 144.6, 208.5, 649.9, **104.4**, 720.0 | 4 | 5/5 | **104.40s** |
+| 2 | 209.8, 210.3, 118.3, **103.7**, 719.5 | 4 | 5/5 | **103.74s** |
+| 3 | 206.9, 421.9, **105.5**, 208.2, 146.2 | 3 | 5/5 | **105.49s** |
+
+This clears the planned success bar: 3/3 runs found a 5/5 scheduler and all
+three beat the 180.55s `cure-overalloc-preserve` round-1 result. The best
+width-5 result (103.74s) also slightly beats the previous best fully-valid
+single-width chain result (107.71s from `cure-overalloc-best` round 2).
+
+Qualitatively, the selected schedulers are not query-only retreats: 8x/16x keep
+batch near 2380/2413 and interactive near 1256/1267. The weakness is still at
+small scales: 1x completes no batch and only ~240-271 interactive; 2x completes
+most interactive but no batch in two runs. The win is real, but the next
+quality target is small-scale batch/interactive progress, not just validity.
+
+Timeout note: selected candidates finished each per-scale subprocess in under
+about 60s in these runs; the 180s cap mainly caught bad candidates that were
+already uncompetitive. It is reasonable to try a separate `--subprocess-timeout
+120` ablation for wall-clock savings, but do not mix that with the main K=5
+comparison until recorded separately.
+
+**Two robust takeaways regardless of the selector bug:**
+1. The chain *did* produce the study's best fully-valid scheduler — round-2:
+   **5/5, 107.71s** (vs 485s baseline = −78%; vs `--select last` round-1
+   180s). A genuine, non-degenerate, all-classes-served win exists.
+2. Round-1 variance persists: a fresh draw from the same 3/5 input produced a
+   3/5 input-clone, not the 180s/5/5 of the `last` chain. Preserve-feedback
+   steers *direction* when failures are shown but does not remove single-shot
+   sample variance — consistent with the earlier variance finding.
 
 ### Stage A (`20260514_193919_*`)
 
@@ -94,12 +288,72 @@ Baseline run on `scheduler_high_006.py` + `bench_canonical_train.csv` at high ef
 
 Same scheduler/trace/effort, only difference: `prompts.py:get_iteration_feedback_prompt` now surfaces `failure_error_counts` (OOM=2 timeout=1139), `mean_memory_{allocated,consumed}_percent`, `assignments`, `containers_completed`. LLM design shifted from "pool-fraction-based aggressive allocation" (Stage A: 32GB query RAM floor) to "operator-minimum-based allocation x safety 1.15-1.30" (Stage B: 6GB query RAM floor, with `_guess_op_min_ram_gb` to read op's actual requirement). 75 fewer lines, comment explicitly says "RAM near the minimum". **Confirmed: prompt signals drive design direction.**
 
-### What we still don't have
+### Stage B-2/B-3 (`20260515_095542_*`)
 
-Both V0 and V1 outputs regressed badly. Step 1 single-iter improvement is not yet a reliable signal in either direction.
+First run with the corrected score formula and three infrastructure changes:
 
-### Backlog for next variants
+1. `iterate_worker.py` uses `unfinished_penalty_seconds = 2 * max_job_seconds`, matching the prompt's stated objective.
+2. `subprocess_timeout` lowered from 600s to 180s per scale (still ~1.5x historical max for 01/02 functional schedulers).
+3. `prompts/system_iterate.md` adds a "Hard Constraints" section covering: per-tick allocation accounting (track `avail_*_pool` snapshots locally), no overallocation, bounded OOM retry depth (cap at e.g. 5).
+4. `tool/iterate.py` now also auto-evaluates `scheduler_out.py` and writes `eval_out.json` plus an in/out comparison.
 
-- **Stage B-2 - API contract in system prompt.** V0's `Overallocated CPU/RAM in assignment` failures show the LLM doesn't know that within one scheduler tick, `Assignment.cpu/ram` must respect `pool.avail_cpu_pool/avail_ram_pool` minus what's already been allocated this tick (pool counters don't auto-decrement). Add this to `prompts/system_iterate.md`.
-- **Stage B-3 - investigate V1 timeout.** Likely OOM retry death loop from too-small initial allocations. Either bound retry depth in prompt, or surface "previous attempts ram_attempted=X" so LLM stops doubling indefinitely.
-- **Stage B-4 - workload picture.** Prompt currently shows zero info about the trace itself (pipeline mix, operator RAM distribution, DAG shape). LLM is improving blind to what it's scheduling.
+Same input scheduler + trace as Stage A/B V1.
+
+**Hard Constraints partially landed.** scheduler_out runs cleanly on 1x/2x/4x — the Stage A "Overallocated CPU/RAM in assignment" failures are GONE. So constraint #1+#2 (API contract) is taking effect. But 8x/16x still subprocess-timeout, and OOM count jumped from 2 (input) to 38-39 per scale (output). The LLM overcorrected: it went from input's "pre-reserve 92% RAM, use 15%" (too conservative) to output's "allocate near operator minimum" (too aggressive), causing massive OOMs that even the bounded retry can't fully contain at large scales.
+
+**Output is 18% worse than input on the corrected metric.** But this is a fairer comparison than before because the score formula now reflects what the prompt promised.
+
+### ⚠️ Validity correction (2026-05-15) — oracle leak in B-4 v2 onward
+
+B-4 v2 added a system-prompt section telling the LLM to size RAM via
+`seg.get_peak_memory_gb()`. That method returns the simulator's **ground-truth
+peak RAM** used to decide OOM (and == `seg.storage_read_gb` here, since
+`memory_gb` is None in bench_canonical_train). A real scheduler cannot know an
+operator's true peak RAM before running it — the Eudoxia context explicitly
+says memory must be inferred from runtime signals. **Every B-8 "win" run
+(`132010`, `152045`, `160015`, `163651`) used this oracle and is therefore an
+"upper-bound-with-oracle" data point, NOT evidence the LLM can design a good
+scheduler under realistic uncertainty.** The B-4 workload summary's
+`storage_read_gb → RAM` line was the same leak in the user prompt.
+
+Fix: removed all per-op memory introspection from `system_iterate.md`
+(replaced with explicit OOM-driven-discovery guidance) and stripped all
+resource-curve fields (memory/storage/cpu_seconds/scaling) from
+`tool/trace_summary.py`. Input schedulers (high_006/045/021) were verified to
+use NO oracle fields either, so the fair-B-8 in/out comparison is
+apples-to-apples under realistic memory uncertainty.
+
+**fair-B-8 result (`165441`, no oracle):** input 485.4s → output **128.77s,
+-73.5%, 5/5**. The win survives without the oracle. Quantified oracle
+contribution: ~13 percentage points (-86% with oracle vs -73% without) and
+OOM elimination (0 vs thousands). Conclusion: the bulk of the improvement
+comes from correct scheduling structure (API contract + bounded retries +
+objective intuition + per-tick budget), NOT memory clairvoyance. Per-scale,
+fair-B-8 nearly matches the oracle version at 16x (27.8s vs ~30s) but pays a
+large OOM-discovery tax at 1x (431s) — a realistic, sensible behaviour.
+
+### Headline finding (Stages A through B-8) — provisional, see validity correction above
+
+**Single-iteration prompt enrichment can produce 5/5-passing schedulers that BEAT a well-tuned input by 85% — but each of 6 distinct prompt enhancements was needed to get there.** Each enhancement fixed exactly one class of failure mode and unlocked the next, in this order:
+
+1. API correctness (Hard Constraints #1+#2) - stops Overallocated crashes
+2. Bounded retries (Hard Constraint #3) - stops infinite OOM loops
+3. Objective intuition (priority weight = pipeline impact) - stops LLM from "fairness across classes"
+4. Per-op resource introspection (Segment API) - stops LLM from blind RAM guessing
+5. Per-tick performance budget (Hard Constraint #4) - stops LLM from writing slow scheduler() bodies
+
+The ordering matters: prepend any of these and the run regresses; remove any of these and the run regresses. Removing (5) was the gating bug for the win.
+
+**Confirmed robust (2026-05-15):**
+- *Replicable:* independent LLM draw, same input + prompt -> 5/5, -86.9% (vs -85.4% first draw).
+- *Generalizes across input:* best/median/worst 01/02 high-effort schedulers all -> 5/5, -82 to -87%.
+- *Side finding:* the 01/02 best/median/worst ranking was an artifact of the buggy `divide_by_completion_rate` metric. Under the correct 720s-penalty objective, ALL one-shot high-effort schedulers score ~483-486s (uniformly bad — they all over-protect query and starve interactive/batch). So "generalizes across input quality" is really "generalizes across superficially-different but equally-bad inputs". The prompt collapses them all to ~64-89s.
+- Pending: generalization across *traces* (only bench_canonical_train tested so far), and per-enhancement ablation.
+
+### Open backlog
+
+- **Stage B-5 - feedback OOM history.** Surface "OOM victims and their attempted RAM" in the user prompt so LLM can see "tried X GB -> OOM; tried Y GB -> OOM" pattern. Lower priority now that get_peak_memory_gb gives ground-truth RAM.
+- **Stage B-6 - tighter retry advice.** Constraint #3 says "cap retries"; could add "back off conservatively when uncertain". Optional polish.
+- **Synthesis mode (#11).** Multi-scheduler input -> one synthesized output. Becomes interesting now that we have a winning baseline to synthesize from.
+- **Generalization study.** Run B-8 prompt across multiple input schedulers (best/worst/median from 01/02) and multiple traces; check if win replicates.
+- **Chain iteration.** Now that single-iter wins, does running B-8 iteratively (output of run N becomes input of run N+1) keep improving or plateau?

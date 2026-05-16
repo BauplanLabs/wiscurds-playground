@@ -33,7 +33,10 @@ os.chdir(SUMMER2026_DIR)
 
 from llm import generate_policy, setup_cost_tracking, reset_cost_tracking, get_cost_statistics, get_last_request_cost
 from prompts import get_user_request
-from tool.config import DEFAULT_MODEL, RESULTS_DIR, SCHEDULERS_DIR, SUPPORTED_EFFORTS, TWO_SHOT_PERF_CONDITIONS
+from tool.config import (
+    DEFAULT_MODEL, ONESHOT_DIR, ONESHOT_EST_DIR, RESULTS_DIR, SCHEDULERS_DIR,
+    SUPPORTED_EFFORTS, TWO_SHOT_PERF_CONDITIONS,
+)
 
 
 def generate_one_scheduler(
@@ -108,13 +111,13 @@ def _save_failure(scheduler_dir: Path, policy_key: str, error: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _select_source_scheduler(source: str) -> tuple:
-    """Select best/worst/median scheduler from 01_reasoning/low results.
+    """Select best/worst/median scheduler from oneshot/low results.
 
     Returns (record_dict, scheduler_path).
     """
-    analysis_path = RESULTS_DIR / "01_reasoning" / "low" / "analysis.jsonl"
+    analysis_path = ONESHOT_DIR / "results" / "low" / "analysis.jsonl"
     assert analysis_path.exists(), (
-        f"No results at {analysis_path}. Run: python analyze.py 01_reasoning"
+        f"No results at {analysis_path}. Run: python analyze.py oneshot"
     )
     seen: dict[str, dict] = {}
     with open(analysis_path) as f:
@@ -126,7 +129,7 @@ def _select_source_scheduler(source: str) -> tuple:
     records = list(seen.values())
 
     functional = [r for r in records if r.get("functional") and r.get("median_latency") is not None]
-    assert functional, "No functional schedulers in 01_reasoning/low results"
+    assert functional, "No functional schedulers in oneshot/low results"
 
     def _gmean(r):
         finite = [v for v in r.get("metric_values", []) if v != float('inf') and v > 0]
@@ -140,7 +143,7 @@ def _select_source_scheduler(source: str) -> tuple:
         med_val = _statistics.median(_gmean(r) for r in functional)
         chosen = min(functional, key=lambda r: abs(_gmean(r) - med_val))
 
-    sched_path = SCHEDULERS_DIR / "reasoning" / "low" / chosen["filename"]
+    sched_path = ONESHOT_DIR / "schedulers" / "low" / chosen["filename"]
     assert sched_path.exists(), f"Scheduler file not found: {sched_path}"
     return chosen, sched_path
 
@@ -314,7 +317,7 @@ def _run_two_shot_perf(args) -> None:
 
     source_filename = source_info["filename"]
     source_median_latency = source_info["full_sim_median_latency"]
-    source_path = SCHEDULERS_DIR / "reasoning" / "low" / source_filename
+    source_path = ONESHOT_DIR / "schedulers" / "low" / source_filename
     assert source_path.exists(), f"Source scheduler not found: {source_path}"
     source_code = source_path.read_text()
 
@@ -444,9 +447,9 @@ def main() -> None:
         return
 
     if args.exp == "estimation":
-        scheduler_dir = SCHEDULERS_DIR / "estimation"
+        scheduler_dir = ONESHOT_EST_DIR / "schedulers"
     else:
-        scheduler_dir = SCHEDULERS_DIR / "reasoning" / args.effort
+        scheduler_dir = ONESHOT_DIR / "schedulers" / args.effort
     scheduler_dir.mkdir(parents=True, exist_ok=True)
     print(f"\n{scheduler_dir}  |  exp={args.exp}  effort={args.effort}  n={args.n}  model={args.model}")
 

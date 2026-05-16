@@ -44,19 +44,25 @@ The infrastructure work above directly enables this: a unified scenario registry
 scenarios/        single source of truth for (train_trace, test_trace, params, objective):
                     scenarios.csv         - the registry
                     params/               - sim parameter TOMLs (v1..v4) referenced by the registry
-traces/  traces-v2/   raw CSV traces (legacy + current)
-                  Current canonical test trace: traces/bench_canonical_train.csv
+                    traces/v1/            - raw CSV traces (legacy bench_*; canonical lives here)
+                    traces/v2/            - raw CSV traces (current scenario set)
+                  Current canonical test trace: scenarios/traces/v1/bench_canonical_train.csv
+                  (historical experiments/*/runs/*/chain.json absolute/relative `traces\`
+                   paths no longer resolve - those archived chains are not re-runnable
+                   in place; their conclusions live in experiments/RESEARCH_LOG.md).
 prompts/          editable prompt templates + domain context for the LLM:
                     system_iterate.md     - system prompt skeleton ({context} placeholder)
                     context/              - eudoxia domain text filled into {context}
                     README.md
-schedulers/       retained 01/02 input schedulers:
-                    reasoning/            - one-shot reasoning-effort schedulers
-                    estimation/           - one-shot estimator schedulers
-results/          per-experiment evaluation outputs from 01/02 (analysis.jsonl, summary.csv, ...)
-plots/            paper-figure PDFs/PNGs from 01/02
-iterations/       per-run artifacts written by tool/iterate.py - one subdir per invocation;
-                  canonical location for every iteration's scheduler_in/out + prompts + eval
+experiments/      one subtree per experiment - each owns its schedulers + results + plots:
+                    oneshot/              - retained 01 (was schedulers/reasoning + results/01_reasoning):
+                                            schedulers/{none,low,medium,high}/ results/ plots/
+                    oneshot-est/          - retained 02 (was schedulers/estimation + results/02_estimation)
+                    <experiment>/runs/    - all tool/iterate.py / iterate_chain.py per-run +
+                                            chain output (run-dir contract; gitignored except
+                                            two tracked prompt-quality reference runs; see experiments/README.md)
+                    RESEARCH_LOG.md       - the research log (tracked)
+results/          only tool/probe/run_probes.py output (results/probes/, regenerated locally)
 tool/             current single-iteration loop:
                     iterate.py            - entry point
                     iterate_worker.py     - subprocess simulator runner
@@ -79,10 +85,18 @@ Install dependencies from this directory with `uv sync`, then run commands with
 
 ```
 # Current workflow - one LLM iteration on a single scheduler
-uv run python tool/iterate.py --scheduler <path> --trace <path> --dry-run
-uv run python tool/iterate.py --scheduler <path> --trace <path>
-#   writes iterations/<run_id>/ with prompts (rendered + template copies),
+uv run python tool/iterate.py --experiment <name> --scheduler <path> --trace <path> --dry-run
+uv run python tool/iterate.py --experiment <name> --scheduler <path> --trace <path>
+#   writes experiments/<experiment>/runs/<N>/iters/1/ with prompts (rendered + template copies),
 #   raw LLM response, scheduler_in.py, scheduler_out.py, eval_in.json, meta.json
+
+# Decomposed workflow - each iteration step standalone, sharing --output-dir.
+# A run dir's public interface is scheduler_out.py + eval_out.json.
+uv run python tool/iterate.py evaluate  --output-dir <dir> --scheduler <seed> --trace <t.csv>
+uv run python tool/iterate.py genprompt --output-dir <dir> --input-dirs <d1>[,<d2>...] --trace <t.csv>
+uv run python tool/iterate.py gensched  --output-dir <dir>
+uv run python tool/iterate.py nextiter  --output-dir <dir> --input-dirs <d1> --trace <t.csv>
+#   no subcommand -> original single-shot flow (unchanged). See experiments/README.md.
 
 # Swap the system prompt without touching Python:
 uv run python tool/iterate.py --scheduler <path> --trace <path> \
@@ -94,8 +108,8 @@ uv run python tool/probe/run_probes.py <schedulers-dir>
 
 # --- Legacy 01/02 workflow (kept runnable; not the current research direction) ---
 uv run python tool/legacy/generate.py --exp reasoning --effort low --n 50
-uv run python tool/legacy/analyze.py 01_reasoning
-uv run python tool/legacy/plot.py 01_reasoning
+uv run python tool/legacy/analyze.py oneshot
+uv run python tool/legacy/plot.py oneshot
 uv run python tool/legacy/batch_iteration_tool.py --schedulers <dir> --trace <path> --output <dir>
 ```
 
@@ -111,7 +125,7 @@ These are on top of the global rules in `~/.claude/CLAUDE.md` - don't restate th
 - **Scenarios are the contract.** A scenario id (e.g. `s001`) should fully determine `(train_trace, test_trace, params, sim_overrides, objective)`. If an experiment needs a knob the scenario doesn't expose, extend the scenario schema - don't pass side-channel CLI flags.
 - **Subprocess for scheduler eval, no exceptions.** Generated scheduler code is untrusted Python - always run it in `tool/iterate_worker.py` style isolation with a timeout, never `exec` in-process.
 - **Cost is observable.** Every LLM call must go through `llm.completion_with_retry` / `setup_cost_tracking` so `get_cost_statistics()` totals stay correct.
-- **Don't silently dedupe results.** If a run is repeated, append to `results/iterations/<run_id>/...` with a new run_id; never overwrite. Resumption is opt-in via `--resume`, not the default.
+- **Don't silently dedupe results.** If a run is repeated, append under `experiments/<experiment>/runs/<N>/...`; never overwrite another run.
 - **Windows-aware I/O.** Always pass `encoding="utf-8"` to `read_text()` / `write_text()` - system locale on this machine is GBK and will silently corrupt markdown.
 
 ## When to ask vs. when to proceed
@@ -124,12 +138,12 @@ These are on top of the global rules in `~/.claude/CLAUDE.md` - don't restate th
 
 ## Status note
 
-Phase 1 of the reorg is done (single repo, flat imports, `.env` local, dry-run validated). Phase 2 (scenario registry) is open. Phase 3 (detailed per-iter logger) landed via `tool/iterate.py` writing every artifact to `iterations/<run_id>/`. Next: enrich the diagnostics flowing into the feedback prompt (Step 1 context audit - see "Research direction" above).
+The current layout is self-contained: scenario registry and traces are under `scenarios/`, generated run artifacts go under `experiments/<experiment>/runs/<N>/iters/<M>/`, and `tool/iterate.py` / `tool/iterate_chain.py` share the prompt and LLM core. Next: enrich the diagnostics flowing into the feedback prompt (Step 1 context audit - see "Research direction" above).
 
 ## Deferred experiments / backlog
 
 Tracked here so we don't lose ideas while focusing on Step 1.
 
 - **Synthesis mode (multi-scheduler -> one improved).** `tool/iterate.py` currently takes a single `--scheduler`. Idea: accept `--schedulers X.py,Y.py,Z.py`, evaluate each, and feed all N + their per-scale results into one LLM call asking it to synthesize the strongest ideas. Single new function `prompts.py:get_synthesis_feedback_prompt(new_policy_key, candidates, base_params)`. ~70 lines. Decide *after* Step 1 single-scheduler context is solid.
-- **Chained iteration (round-N sees rounds 1..N-1).** Not implemented despite vestigial "consider previous attempts" wording in legacy `prompts.py:get_user_request_v2*`. Would need a `--chain` arg, `iterations/<chain_id>/iter_NNN/` nesting, and history injection into the user prompt. Token cost grows linearly with chain depth. Build only when needed for the NOVAS "iterative improvement curve" experiment.
+- **Chained iteration polish.** `tool/iterate_chain.py` exists and supports `last`, `best`, `lastn-1`, and `best-k:K`; add richer history injection only if the NOVAS iterative-improvement curve needs it.
 - **Dead code cleanup in `prompts.py`.** `ITERATION_SYSTEM_PROMPT` (superseded by `prompts/system_iterate.md`), `get_user_request_v2`, and `get_user_request_v2_est` are unimported. Delete when prompts.py is touched anyway.

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable
 
 TRACES_DIR = Path(__file__).resolve().parent
-SUMMER2026_DIR = TRACES_DIR.parent
+SUMMER2026_DIR = TRACES_DIR.parents[2]  # scenarios/traces/v1 -> summer2026
 sys.path.insert(0, str(SUMMER2026_DIR / "tool"))
 
 from trace_generator import (
