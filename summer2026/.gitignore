@@ -9,6 +9,24 @@ __pycache__/
 # uv debug logs (regenerate each sync; not needed in repo)
 uv-*.log
 
-# Per-run iteration artifacts can contain prompts/responses and old traces.
-# Keep iterations/README.md tracked, but regenerate run directories locally.
-iterations/*/
+# Ablation prompt variants are exploratory inputs, not part of the shared
+# tool surface; keep them local.
+prompts/system_iterate_ablate_*.md
+
+# tool/probe/run_probes.py regenerates results/probes/ on demand
+# (it self-creates the dir); raw probe output is not tracked.
+/results/
+
+# Per-run iteration/chain artifacts (prompts/responses/eval) are bulky and
+# regenerated locally. tool/iterate.py + iterate_chain.py write them to
+# experiments/<experiment>/runs/<N>/iters/<M>/. Curated experiments/oneshot{,-est}/
+# (no runs/ subdir) and experiments/RESEARCH_LOG.md stay tracked; all run
+# output is ignored. (Two reference runs under experiments/prompt-quality/runs/{1,2}/
+# were force-added and remain tracked, preserving the pre-merge state.)
+experiments/*/runs/
+!experiments/prompt-quality/runs/
+experiments/prompt-quality/runs/*
+!experiments/prompt-quality/runs/1/
+!experiments/prompt-quality/runs/1/**
+!experiments/prompt-quality/runs/2/
+!experiments/prompt-quality/runs/2/**
