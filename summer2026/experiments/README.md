@@ -21,9 +21,8 @@ compatibility alias.
 
 ## Tracked vs Generated
 
-- `oneshot/`: retained 01 collection: seed schedulers, results, probes, plots.
-- `oneshot-est/`: retained 02 collection for estimation-noise studies.
-- `RESEARCH_LOG.md`: tracked research notes.
+- `oneshot/`, `oneshot-est/`: retained one-shot scheduler collections.
+- `RESULTS.md`: concise experiment results (key configs and result tables).
 - `<experiment>/runs/`: generated prompts, responses, schedulers, and eval JSON.
   These are gitignored by default, except already tracked reference runs.
 
@@ -59,15 +58,15 @@ uv run python tool/iterate.py nextiter --output-dir experiments/E/r1 `
 
 `--input-dirs A,B,...` switches prompt generation to the multi-candidate path.
 
-## Current Experiments
+## Experiment Groups
 
-| Experiment | Purpose | Starting point |
-|---|---|---|
-| `oneshot/` | Retained one-shot reasoning-effort study. | No seed scheduler; each scheduler is generated directly from the one-shot prompt. |
-| `oneshot-est/` | Retained one-shot estimation-noise study. | No iterative seed; uses generated `scheduler_est_*.py` schedulers and compares estimator conditions. |
-| `prompt-quality/` | Prompt/feedback quality audit for the current iteration loop. | `experiments/oneshot/schedulers/high/scheduler_high_006.py` on `scenarios/traces/v1/bench_canonical_train.csv`. |
-| `cure-overalloc/` | First chain test: can iteration fix over-allocation crashes? | `experiments/cure-overalloc/runs/1/iter_001_20260515_185912/scheduler_in.py` (`20260515_173934...` prompt-quality output). |
-| `cure-overalloc-preserve/` | Same chain with preserve-feedback added. | Same `scheduler_in.py` as `cure-overalloc/`. |
-| `cure-overalloc-best/` | Test `--select best`; exposed the old selector scoring bug. | Same `scheduler_in.py` as `cure-overalloc/`. |
-| `cure-overalloc-best2/` | Re-run `--select best` after fixing selector scoring. | Same `scheduler_in.py` as `cure-overalloc/`. |
-| `cure-overalloc-bestofn/` | Best-of-N sampling-width test using `--width K`. | Same `scheduler_in.py` as `cure-overalloc/`. |
+| Group | Description |
+|---|---|
+| `oneshot/` | One-shot schedulers by reasoning effort (`none`/`low`/`medium`/`high`). Seed pool for later experiments. |
+| `oneshot-est/` | One-shot schedulers under different runtime-estimator noise conditions. |
+| `prompt-quality/` | Prompt and feedback quality audit; two tracked reference runs. |
+| `chain/` | Iterative chain experiments (`chain-last`, `chain-last-preserve`, `chain-best-v1`, `chain-best`, `chain-w5`, `chain-depth10`, `chain-depth10-bestk2`). |
+| `prompt-ablation/` | System prompt ablation (`short` vs `full` and section drop-outs); 2 seeds × up to 6 arms × n=5 draws. |
+| `cross-scen/` | Cross-scenario generalization: 4 v2 traces × 3 arms (`short·n=1`, `short·n=5`, `full·n=5`). |
+| `width/` | Sampling width study: `short`/`full` prompt × `n=1`/`n=5` × 2 seeds. |
+| `query/` | Assembled-query prompt exploration (smoke test and single-scenario runs). |

@@ -49,7 +49,8 @@ sys.path.insert(0, str(SUMMER2026_DIR))
 from dotenv import load_dotenv
 from tool.config import get_canonical_base_params, PROJECT_ROOT
 from tool.trace_summary import summarize_trace
-from prompts import get_iteration_feedback_prompt, get_multi_candidate_feedback_prompt
+from prompts import get_iteration_feedback_prompt, get_multi_candidate_feedback_prompt, get_minimal_prompt
+from tool.query import available_queries_text, run_query
 
 os.environ.setdefault("LITELLM_LOG", "ERROR")
 logging.getLogger("eudoxia").setLevel(logging.CRITICAL)
@@ -242,6 +243,50 @@ def llm_to_code(
 
 
 # ---------------------------------------------------------------------------
+# Step 2 helpers (query-driven context)
+# ---------------------------------------------------------------------------
+
+_QUERY_REQUEST_SUFFIX = """
+
+---
+
+## What additional context would help you?
+
+Before generating the improved scheduler, declare any additional workload data you want to see.
+
+Available queries:
+
+{available_queries}
+
+Reply with ONLY a JSON object (no explanation, no code):
+{{"queries": [{{"name": "query_name", "args": {{...}}}}, ...]}}
+
+Request any number of queries. To skip: {{"queries": []}}
+"""
+
+
+def _parse_query_response(raw: str) -> list[dict]:
+    """Extract query list from LLM Phase-1 JSON response. Returns [] on failure."""
+    text = re.sub(r"```(?:json)?|```", "", raw).strip()
+    start = text.find("{")
+    if start == -1:
+        return []
+    depth = 0
+    for i, c in enumerate(text[start:], start):
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    data = json.loads(text[start : i + 1])
+                    return [q for q in data.get("queries", []) if isinstance(q, dict)]
+                except Exception:
+                    return []
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Subcommand layer  -  each step of an iteration as a standalone command that
 # shares one --output-dir as its unit of state. A run dir's public interface
 # (what a later round consumes) is scheduler_out.py + eval_out.json.
@@ -339,6 +384,90 @@ def cmd_nextiter(
                   system_prompt_path, context_path, no_workload_summary)
     cmd_gensched(out_dir, model, effort, verbose)
     return cmd_evaluate(out_dir, trace, scales, base_params)
+
+
+def cmd_query(
+    out_dir: Path, input_dirs: list[Path], trace: Path, base_params: dict,
+    system_prompt_path: Path, context_path: Path,
+    model: str, effort: str,
+    no_workload_summary: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Step 2 two-phase prompt building.
+
+    Phase 1: LLM sees current performance and declares which queries it wants.
+    Queries are fetched from the trace / eval data.
+    Phase 2: query results are appended to the normal feedback prompt.
+
+    Writes the same outputs as genprompt (prompt_user.txt, prompt_system.txt,
+    scheduler_in.py, eval_in.json) so gensched can follow unchanged, plus
+    query artifacts (query_request_prompt.txt, query_request_response.txt,
+    queries_resolved.json).
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    assert len(input_dirs) == 1, "queryctx supports exactly one --input-dirs entry"
+
+    d = input_dirs[0]
+    code = (d / "scheduler_out.py").read_text(encoding="utf-8")
+    sr = _read_scale_results(d / "eval_out.json")
+    eval_data = json.loads((d / "eval_out.json").read_text(encoding="utf-8"))
+
+    system_prompt = load_system_prompt(system_prompt_path, context_path)
+    minimal_body = get_minimal_prompt(_policy_key(code), code, sr, base_params)
+
+    # Phase 1: LLM sees only the score + available queries, declares what it needs
+    p1_user = minimal_body + _QUERY_REQUEST_SUFFIX.format(
+        available_queries=available_queries_text()
+    )
+    p1_system = (
+        context_path.read_text(encoding="utf-8")
+        + "\n\nYou are a systems expert reviewing scheduler performance. "
+        "Reply ONLY with a JSON object — no explanation, no code."
+    )
+    if verbose:
+        print("[query] Phase 1: requesting context from LLM ...")
+    raw_p1 = call_llm(p1_user, p1_system, model, effort, verbose)
+    (out_dir / "query_request_prompt.txt").write_text(p1_user, encoding="utf-8")
+    (out_dir / "query_request_response.txt").write_text(raw_p1, encoding="utf-8")
+
+    # Resolve queries
+    requested = _parse_query_response(raw_p1)
+    resolved = [
+        {
+            "name": req.get("name", ""),
+            "args": req.get("args", {}),
+            "result": run_query(
+                req.get("name", ""), req.get("args", {}), trace.resolve(), eval_data
+            ),
+        }
+        for req in requested
+    ]
+    (out_dir / "queries_resolved.json").write_text(
+        json.dumps(resolved, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    if verbose:
+        print(f"[query] Resolved {len(resolved)} queries: {[r['name'] for r in resolved]}")
+
+    # Phase 2: minimal body + query results + produce instruction
+    policy_key = _policy_key(code)
+    query_section = ""
+    if resolved:
+        parts = [r["result"] for r in resolved]
+        query_section = "\n\n## Additional Context (requested)\n\n" + "\n\n".join(parts)
+
+    produce = (
+        f"\n\nProduce an improved version of this scheduler that reduces the geometric mean "
+        f"of adjusted latency across all cluster sizes.\n\n"
+        f'Use the EXACT key "{policy_key}" in both @register_scheduler_init and '
+        f"@register_scheduler decorators.\nOutput ONLY the complete Python code."
+    )
+
+    (out_dir / "prompt_user.txt").write_text(minimal_body + query_section + produce, encoding="utf-8")
+    (out_dir / "prompt_system.txt").write_text(system_prompt, encoding="utf-8")
+    (out_dir / "scheduler_in.py").write_text(code + "\n", encoding="utf-8")
+    (out_dir / "eval_in.json").write_text(
+        json.dumps({str(k): v for k, v in sr.items()}, indent=2), encoding="utf-8"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -602,7 +731,7 @@ def _dirs(s: str) -> list[Path]:
     return [Path(x.strip()) for x in s.split(",") if x.strip()]
 
 
-_SUBCOMMANDS = {"evaluate", "genprompt", "gensched", "nextiter"}
+_SUBCOMMANDS = {"evaluate", "genprompt", "gensched", "nextiter", "query"}
 
 
 def main() -> None:
@@ -649,6 +778,10 @@ def main() -> None:
     sn = sub.add_parser("nextiter", help="genprompt + gensched + evaluate")
     _common(sn, needs_inputs=True, needs_llm=True)
 
+    sq = sub.add_parser("query",
+                        help="Step 2: Phase-1 LLM context request -> queries -> prompt")
+    _common(sq, needs_inputs=True, needs_llm=True)
+
     a = p.parse_args(argv)
     base_params = get_canonical_base_params()
 
@@ -666,6 +799,11 @@ def main() -> None:
         cmd_nextiter(a.output_dir, a.input_dirs, a.trace, a.scales, base_params,
                      a.system_prompt, a.context, a.model, a.effort,
                      a.no_workload_summary, a.verbose)
+    elif a.cmd == "query":
+        assert a.trace, "query needs --trace"
+        cmd_query(a.output_dir, a.input_dirs, a.trace, base_params,
+                  a.system_prompt, a.context, a.model, a.effort,
+                  a.no_workload_summary, a.verbose)
     print(f"[{a.cmd}] done -> {a.output_dir}")
 
 

@@ -24,6 +24,7 @@ prompts/system_iterate_ablate_*.md
 # output is ignored. (Two reference runs under experiments/prompt-quality/runs/{1,2}/
 # were force-added and remain tracked, preserving the pre-merge state.)
 experiments/*/runs/
+experiments/chain/*/runs/
 !experiments/prompt-quality/runs/
 experiments/prompt-quality/runs/*
 !experiments/prompt-quality/runs/1/

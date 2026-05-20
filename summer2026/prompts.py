@@ -35,51 +35,68 @@ import statements inside the function itself, should they be needed.
 Do NOT generate your own poliy key - you MUST use exactly what is provided in the user request.
 """
 
-ITERATION_SYSTEM_PROMPT = """{context}
+# Superseded by prompts/system_iterate.md — kept for reference
+# ITERATION_SYSTEM_PROMPT = """{context} ...full system prompt... """
 
-## Scheduler Registration
 
-Every scheduler must register two functions using decorators:
+def get_minimal_prompt(
+    policy_key: str,
+    scheduler_code: str,
+    scale_results: dict,
+    base_params: dict,
+) -> str:
+    """Objective + per-scale latency only — no per-priority, memory%, or failure details.
 
-@register_scheduler_init(key="myscheduler")
-def init(s):
-    s.queue = []  # s also has s.executor, s.params
+    Phase 1 base for the Step 2 query flow: LLM sees only the score, then
+    declares what additional context it needs via query functions.
+    Returns the prompt body without a trailing produce instruction so the caller
+    can append query results before adding it.
+    """
+    import math
 
-@register_scheduler(key="myscheduler")
-def schedule(s, results, pipelines):
-    suspensions = []
-    assignments = []
-    return suspensions, assignments
+    rows = []
+    valid_latencies: list[float] = []
+    for scale in sorted(scale_results):
+        r = scale_results[scale]
+        cpus = base_params["cpus_per_pool"] * scale
+        ram = base_params["ram_gb_per_pool"] * scale
+        if r.get("ok"):
+            lat = r["latency"]
+            valid_latencies.append(lat)
+            rows.append(f"  {scale:2d}x  ({cpus:5d} CPUs, {ram:6d} GB RAM)  adj={lat:.4f}s")
+        else:
+            rows.append(
+                f"  {scale:2d}x  ({cpus:5d} CPUs, {ram:6d} GB RAM)  "
+                f"FAILED: {r.get('error', 'unknown error')}"
+            )
 
-## Operator State Machine
+    perf = "\n".join(rows)
+    if valid_latencies:
+        gm = math.exp(sum(math.log(max(v, 1e-12)) for v in valid_latencies) / len(valid_latencies))
+        gm_line = f"Geometric mean: {gm:.4f}s ({len(valid_latencies)}/{len(scale_results)} scales ok)"
+    else:
+        gm_line = f"ALL {len(scale_results)} RUNS FAILED"
 
-PENDING -> ASSIGNED -> RUNNING -> COMPLETED; FAILED -> ASSIGNED (retry); SUSPENDING -> PENDING
-ASSIGNABLE_STATES = {{PENDING, FAILED}}
+    return f"""\
+## Objective Function
 
-## OOM Behavior
+For each pipeline, assign a latency value:
+  - Completed pipeline: actual end-to-end latency in seconds
+  - Incomplete or failed pipeline: 2 x max_job_seconds (e.g. 720s if max_job_seconds=360)
 
-When a container exceeds its RAM limit, it is killed and operators fail. Retry failed operators with more RAM. Resource estimates can be wrong in either direction: overestimates waste capacity, underestimates cause OOM. OOM failures are recoverable through retry, so be slightly aggressive with allocation rather than overly conservative.
+Weighted average:
+  score = (sum query_latency x 10 + sum interactive_latency x 5 + sum batch_latency x 1)
+        / (query_arrivals x 10 + interactive_arrivals x 5 + batch_arrivals x 1)
 
-## API Reference
+## Performance Results
 
-- Priority.QUERY, Priority.INTERACTIVE, Priority.BATCH_PIPELINE  -  priority levels (QUERY is highest)
-- Assignment(ops=op_list, cpu=cpu_amount, ram=ram_amount, priority=priority, pool_id=pool_id, pipeline_id=pipeline.pipeline_id)  -  to create assignments
-- Suspend(container_id, pool_id)  -  to create suspensions
-- s.executor.num_pools  -  number of available pools
-- s.executor.pools[i].avail_cpu_pool  -  available CPU in pool i
-- s.executor.pools[i].avail_ram_pool  -  available RAM in pool i
-- s.executor.pools[i].max_cpu_pool  -  max CPU in pool i
-- s.executor.pools[i].max_ram_pool  -  max RAM in pool i
-- Pipeline has .priority, .pipeline_id, .values (DAG of operators), and .runtime_status() method
-- ExecutionResult has .priority, .ops, .container_id, .pool_id, .ram, .cpu, .error, and .failed() method
-- pipeline.runtime_status().get_ops(states, require_parents_complete=True/False)  -  get operators matching states
-- pipeline.runtime_status().is_pipeline_successful()  -  returns True if all operators completed
-- OperatorState enum: PENDING, ASSIGNED, RUNNING, SUSPENDING, COMPLETED, FAILED (ASSIGNABLE_STATES = {{PENDING, FAILED}})
+{perf}
 
-Available globals (no imports needed): List, Tuple, Pipeline, OperatorState, ASSIGNABLE_STATES, Assignment, ExecutionResult, Suspend, register_scheduler_init, register_scheduler, Priority
+{gm_line}
 
-Output ONLY valid Python code. No markdown fences, no explanation.
-"""
+## Current Scheduler Code
+
+{scheduler_code}"""
 
 
 def get_user_request(policy_key: str, metric: str) -> str:

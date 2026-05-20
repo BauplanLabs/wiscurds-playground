@@ -1,4 +1,5 @@
 train_trace,test_trace,params,objective
+traces/v1/bench_canonical_train.csv,traces/v1/bench_canonical_test.csv,config.py:canonical,basic
 traces/v2/batch-heavy_bursty_balanced_train.csv,traces/v2/batch-heavy_bursty_balanced_test.csv,params/v1.toml,basic
 traces/v2/batch-heavy_bursty_balanced_train.csv,traces/v2/batch-heavy_bursty_balanced_test.csv,params/v1.toml,prio
 traces/v2/batch-heavy_bursty_balanced_train.csv,traces/v2/batch-heavy_bursty_balanced_test.csv,params/v2.toml,basic

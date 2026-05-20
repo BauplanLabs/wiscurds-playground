@@ -31,9 +31,8 @@ Generated run artifacts live under:
 experiments/<experiment>/runs/<N>/iters/<M>/
 ```
 
-`<experiment>` is a human-readable research question or study name. The current
-single-iteration default is `prompt-quality`. The old `--exp` flag still works,
-but new commands should use `--experiment`.
+`<experiment>` is a human-readable experiment name. The old `--exp` flag still
+works, but new commands should use `--experiment`.
 
 ## Current Workflow
 

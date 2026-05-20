@@ -20,13 +20,13 @@ from pathlib import Path
 
 TRACES_DIR = Path(__file__).resolve().parent
 SUMMER2026_DIR = TRACES_DIR.parents[2]  # scenarios/traces/v2 -> summer2026
-sys.path.insert(0, str(SUMMER2026_DIR / "tool"))
+sys.path.insert(0, str(SUMMER2026_DIR / "tool" / "legacy"))
 
 from trace_generator import (
     ArrivalPattern, BurstSpec, PipelineSpec, TraceConfig, TraceGenerator,
 )
 
-DURATION         = 600
+DURATION         = 3600
 TICKS_PER_SECOND = 1000
 NUM_OPS_MEAN     = 5
 DAG_SHAPES       = ["linear", "branch_in", "branch_out"]
@@ -47,8 +47,11 @@ PRIORITY_MIXES = {
 }
 
 # Load level: arrival cadence + optional burst injections.
-# Bursty uses longer gaps with 4 spikes spread across the 600 s window,
-# keeping total pipeline count in the same rough range as steady.
+# Bursty uses longer gaps with periodic spikes. Burst DENSITY (one spike every
+# 150 s, first at t=75, alternating 30/29 pipelines) is held invariant to
+# DURATION: burstiness is a workload-shape property and must not dilute when
+# the observation window lengthens, else the steady-vs-bursty contrast
+# collapses. -> DURATION/150 spikes spread across the whole window.
 LOAD_LEVELS = {
     "steady": dict(
         arrival=ArrivalPattern(waiting_seconds_mean=10, num_pipelines_per_batch=4),
@@ -57,10 +60,9 @@ LOAD_LEVELS = {
     "bursty": dict(
         arrival=ArrivalPattern(waiting_seconds_mean=30, num_pipelines_per_batch=2),
         bursts=[
-            BurstSpec(time_seconds=75,  num_pipelines=30),
-            BurstSpec(time_seconds=225, num_pipelines=29),
-            BurstSpec(time_seconds=375, num_pipelines=30),
-            BurstSpec(time_seconds=525, num_pipelines=29),
+            BurstSpec(time_seconds=75 + 150 * i,
+                      num_pipelines=30 if i % 2 == 0 else 29)
+            for i in range(DURATION // 150)
         ],
     ),
 }
