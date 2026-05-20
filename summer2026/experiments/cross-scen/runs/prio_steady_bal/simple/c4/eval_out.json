@@ -1,0 +1,147 @@
+{
+  "trace": "scenarios\\traces\\v2\\priority-heavy_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "Overallocated CPU in assignment"
+    },
+    "2": {
+      "ok": true,
+      "latency": 15.636881026014189,
+      "failures": 3709,
+      "suspensions": 0,
+      "assignments": 7059,
+      "failure_error_counts": {
+        "OOM": 3709
+      },
+      "oom_count": 3709,
+      "mean_memory_consumed_percent": 16.22,
+      "mean_memory_allocated_percent": 30.66,
+      "containers_completed": 3343,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 8.3,
+        "p99_s": 10.62
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 417,
+        "mean_s": 24.57,
+        "p99_s": 55.66
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 27.33,
+        "p99_s": 62.25
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 13.335805894124068,
+      "failures": 950,
+      "suspensions": 0,
+      "assignments": 4314,
+      "failure_error_counts": {
+        "OOM": 950
+      },
+      "oom_count": 950,
+      "mean_memory_consumed_percent": 7.47,
+      "mean_memory_allocated_percent": 14.81,
+      "containers_completed": 3348,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 417,
+        "mean_s": 19.43,
+        "p99_s": 40.62
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 20.14,
+        "p99_s": 40.79
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 11.69040749499727,
+      "failures": 0,
+      "suspensions": 0,
+      "assignments": 3364,
+      "failure_error_counts": {},
+      "oom_count": 0,
+      "mean_memory_consumed_percent": 3.35,
+      "mean_memory_allocated_percent": 10.7,
+      "containers_completed": 3354,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 16.05,
+        "p99_s": 34.81
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 16.67,
+        "p99_s": 35.49
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 11.69040749499727,
+      "failures": 0,
+      "suspensions": 0,
+      "assignments": 3364,
+      "failure_error_counts": {},
+      "oom_count": 0,
+      "mean_memory_consumed_percent": 1.68,
+      "mean_memory_allocated_percent": 5.35,
+      "containers_completed": 3354,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 16.05,
+        "p99_s": 34.81
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 16.67,
+        "p99_s": 35.49
+      }
+    }
+  }
+}

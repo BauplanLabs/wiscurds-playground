@@ -1,0 +1,95 @@
+{
+  "trace": "scenarios\\traces\\v1\\bench_canonical_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "2": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "4": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "8": {
+      "ok": true,
+      "latency": 34.464364653586756,
+      "failures": 22193,
+      "suspensions": 0,
+      "assignments": 50125,
+      "failure_error_counts": {
+        "OOM": 22193
+      },
+      "oom_count": 22193,
+      "mean_memory_consumed_percent": 36.62,
+      "mean_memory_allocated_percent": 73.09,
+      "containers_completed": 27881,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 8.14,
+        "p99_s": 8.15
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 1256,
+        "mean_s": 35.94,
+        "p99_s": 72.75
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 2380,
+        "mean_s": 46.8,
+        "p99_s": 102.97
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 32.21013871857756,
+      "failures": 22211,
+      "suspensions": 0,
+      "assignments": 50151,
+      "failure_error_counts": {
+        "OOM": 22211
+      },
+      "oom_count": 22211,
+      "mean_memory_consumed_percent": 16.88,
+      "mean_memory_allocated_percent": 33.41,
+      "containers_completed": 27894,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 8.14,
+        "p99_s": 8.14
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 1256,
+        "mean_s": 34.08,
+        "p99_s": 69.65
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 2385,
+        "mean_s": 40.79,
+        "p99_s": 83.89
+      }
+    }
+  }
+}

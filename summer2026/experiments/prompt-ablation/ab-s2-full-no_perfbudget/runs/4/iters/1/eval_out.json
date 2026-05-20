@@ -1,0 +1,39 @@
+{
+  "trace": "scenarios\\traces\\v1\\bench_canonical_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "2": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "4": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "8": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "16": {
+      "ok": false,
+      "error": "subprocess timeout"
+    }
+  }
+}

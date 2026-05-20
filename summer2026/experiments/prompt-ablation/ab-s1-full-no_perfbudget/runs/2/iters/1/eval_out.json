@@ -1,0 +1,180 @@
+{
+  "trace": "scenarios\\traces\\v1\\bench_canonical_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 671.126571122011,
+      "failures": 9951,
+      "suspensions": 0,
+      "assignments": 14054,
+      "failure_error_counts": {
+        "OOM": 8579,
+        "timeout": 1372
+      },
+      "oom_count": 8579,
+      "mean_memory_consumed_percent": 44.64,
+      "mean_memory_allocated_percent": 89.26,
+      "containers_completed": 4096,
+      "query": {
+        "arrived": 430,
+        "completed": 7,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 184,
+        "mean_s": 81.12,
+        "p99_s": 224.46
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "2": {
+      "ok": true,
+      "latency": 487.2914469650521,
+      "failures": 6343,
+      "suspensions": 0,
+      "assignments": 6905,
+      "failure_error_counts": {
+        "OOM": 6343
+      },
+      "oom_count": 6343,
+      "mean_memory_consumed_percent": 6.34,
+      "mean_memory_allocated_percent": 11.8,
+      "containers_completed": 560,
+      "query": {
+        "arrived": 430,
+        "completed": 423,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 6,
+        "mean_s": 76.95,
+        "p99_s": 135.2
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 486.0367489270386,
+      "failures": 6289,
+      "suspensions": 0,
+      "assignments": 6783,
+      "failure_error_counts": {
+        "OOM": 6289
+      },
+      "oom_count": 6289,
+      "mean_memory_consumed_percent": 3.06,
+      "mean_memory_allocated_percent": 5.77,
+      "containers_completed": 492,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 486.0367489270386,
+      "failures": 6286,
+      "suspensions": 0,
+      "assignments": 6783,
+      "failure_error_counts": {
+        "OOM": 6286
+      },
+      "oom_count": 6286,
+      "mean_memory_consumed_percent": 1.53,
+      "mean_memory_allocated_percent": 2.89,
+      "containers_completed": 495,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 486.0367489270386,
+      "failures": 6286,
+      "suspensions": 0,
+      "assignments": 6783,
+      "failure_error_counts": {
+        "OOM": 6286
+      },
+      "oom_count": 6286,
+      "mean_memory_consumed_percent": 0.77,
+      "mean_memory_allocated_percent": 1.45,
+      "containers_completed": 495,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 6.74,
+        "p99_s": 6.74
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    }
+  }
+}

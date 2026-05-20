@@ -1,0 +1,39 @@
+{
+  "trace": "scenarios\\traces\\v2\\priority-heavy_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "no result marker in output: 'ng, errors, newline)\\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"C:\\\\Users\\\\Gu\\\\miniconda3\\\\Lib\\\\pathlib\\\\_abc.py\", line 633, in read_text\\n    return f.read()\\n           ~~~~~~^^\\nUnicodeDecodeError: \\'gbk\\' codec can\\'t decode byte 0x88 in position 2228: illegal multibyte sequence\\n'"
+    },
+    "2": {
+      "ok": false,
+      "error": "no result marker in output: 'ng, errors, newline)\\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"C:\\\\Users\\\\Gu\\\\miniconda3\\\\Lib\\\\pathlib\\\\_abc.py\", line 633, in read_text\\n    return f.read()\\n           ~~~~~~^^\\nUnicodeDecodeError: \\'gbk\\' codec can\\'t decode byte 0x88 in position 2228: illegal multibyte sequence\\n'"
+    },
+    "4": {
+      "ok": false,
+      "error": "no result marker in output: 'ng, errors, newline)\\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"C:\\\\Users\\\\Gu\\\\miniconda3\\\\Lib\\\\pathlib\\\\_abc.py\", line 633, in read_text\\n    return f.read()\\n           ~~~~~~^^\\nUnicodeDecodeError: \\'gbk\\' codec can\\'t decode byte 0x88 in position 2228: illegal multibyte sequence\\n'"
+    },
+    "8": {
+      "ok": false,
+      "error": "no result marker in output: 'ng, errors, newline)\\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"C:\\\\Users\\\\Gu\\\\miniconda3\\\\Lib\\\\pathlib\\\\_abc.py\", line 633, in read_text\\n    return f.read()\\n           ~~~~~~^^\\nUnicodeDecodeError: \\'gbk\\' codec can\\'t decode byte 0x88 in position 2228: illegal multibyte sequence\\n'"
+    },
+    "16": {
+      "ok": false,
+      "error": "no result marker in output: 'ng, errors, newline)\\n           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"C:\\\\Users\\\\Gu\\\\miniconda3\\\\Lib\\\\pathlib\\\\_abc.py\", line 633, in read_text\\n    return f.read()\\n           ~~~~~~^^\\nUnicodeDecodeError: \\'gbk\\' codec can\\'t decode byte 0x88 in position 2228: illegal multibyte sequence\\n'"
+    }
+  }
+}

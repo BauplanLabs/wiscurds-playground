@@ -1,0 +1,68 @@
+{
+  "trace": "scenarios\\traces\\v2\\canonical_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "2": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "4": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "8": {
+      "ok": false,
+      "error": "subprocess timeout"
+    },
+    "16": {
+      "ok": true,
+      "latency": 30.403178674994425,
+      "failures": 51367,
+      "suspensions": 0,
+      "assignments": 56935,
+      "failure_error_counts": {
+        "OOM": 1574,
+        "timeout": 49793
+      },
+      "oom_count": 1574,
+      "mean_memory_consumed_percent": 2.71,
+      "mean_memory_allocated_percent": 5.79,
+      "containers_completed": 5562,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 6.99,
+        "p99_s": 8.73
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 19.79,
+        "p99_s": 41.2
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 807,
+        "mean_s": 49.15,
+        "p99_s": 303.47
+      }
+    }
+  }
+}

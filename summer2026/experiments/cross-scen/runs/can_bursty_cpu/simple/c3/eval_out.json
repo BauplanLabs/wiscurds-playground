@@ -1,0 +1,95 @@
+{
+  "trace": "scenarios\\traces\\v2\\canonical_bursty_cpu-bound_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "Overallocated CPU in assignment"
+    },
+    "2": {
+      "ok": false,
+      "error": "Overallocated CPU in assignment"
+    },
+    "4": {
+      "ok": false,
+      "error": "Overallocated CPU in assignment"
+    },
+    "8": {
+      "ok": true,
+      "latency": 15.952123834886816,
+      "failures": 3217,
+      "suspensions": 0,
+      "assignments": 7154,
+      "failure_error_counts": {
+        "OOM": 3217
+      },
+      "oom_count": 3217,
+      "mean_memory_consumed_percent": 3.1,
+      "mean_memory_allocated_percent": 6.8,
+      "containers_completed": 3936,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 8.84,
+        "p99_s": 8.84
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 18.42,
+        "p99_s": 40.08
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 573,
+        "mean_s": 21.65,
+        "p99_s": 42.93
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 15.952123834886816,
+      "failures": 3217,
+      "suspensions": 0,
+      "assignments": 7154,
+      "failure_error_counts": {
+        "OOM": 3217
+      },
+      "oom_count": 3217,
+      "mean_memory_consumed_percent": 1.55,
+      "mean_memory_allocated_percent": 3.4,
+      "containers_completed": 3936,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 8.84,
+        "p99_s": 8.84
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 18.42,
+        "p99_s": 40.08
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 573,
+        "mean_s": 21.65,
+        "p99_s": 42.93
+      }
+    }
+  }
+}

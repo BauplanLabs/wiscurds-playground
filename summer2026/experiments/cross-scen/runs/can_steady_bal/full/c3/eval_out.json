@@ -1,0 +1,175 @@
+{
+  "trace": "scenarios\\traces\\v2\\canonical_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 96.83412447022083,
+      "failures": 4618,
+      "suspensions": 0,
+      "assignments": 9510,
+      "failure_error_counts": {
+        "OOM": 3847,
+        "timeout": 771
+      },
+      "oom_count": 3847,
+      "mean_memory_consumed_percent": 40.65,
+      "mean_memory_allocated_percent": 86.81,
+      "containers_completed": 4884,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 7.99,
+        "p99_s": 9.36
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 26.25,
+        "p99_s": 58.44
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 520,
+        "mean_s": 222.11,
+        "p99_s": 357.87
+      }
+    },
+    "2": {
+      "ok": true,
+      "latency": 53.81390363595806,
+      "failures": 2343,
+      "suspensions": 0,
+      "assignments": 7937,
+      "failure_error_counts": {
+        "OOM": 2286,
+        "timeout": 57
+      },
+      "oom_count": 2286,
+      "mean_memory_consumed_percent": 22.27,
+      "mean_memory_allocated_percent": 49.92,
+      "containers_completed": 5586,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 6.96,
+        "p99_s": 8.14
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 22.67,
+        "p99_s": 44.9
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 778,
+        "mean_s": 151.14,
+        "p99_s": 348.04
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 18.231302699085433,
+      "failures": 0,
+      "suspensions": 0,
+      "assignments": 5828,
+      "failure_error_counts": {},
+      "oom_count": 0,
+      "mean_memory_consumed_percent": 10.12,
+      "mean_memory_allocated_percent": 22.43,
+      "containers_completed": 5819,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 6.81,
+        "p99_s": 7.84
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 430,
+        "mean_s": 17.99,
+        "p99_s": 37.53
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 842,
+        "mean_s": 21.29,
+        "p99_s": 51.64
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 18.022951148784298,
+      "failures": 0,
+      "suspensions": 0,
+      "assignments": 5833,
+      "failure_error_counts": {},
+      "oom_count": 0,
+      "mean_memory_consumed_percent": 5.06,
+      "mean_memory_allocated_percent": 12.34,
+      "containers_completed": 5823,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 6.81,
+        "p99_s": 7.84
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 430,
+        "mean_s": 17.94,
+        "p99_s": 37.53
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 843,
+        "mean_s": 21.12,
+        "p99_s": 51.24
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 18.022951148784298,
+      "failures": 0,
+      "suspensions": 0,
+      "assignments": 5833,
+      "failure_error_counts": {},
+      "oom_count": 0,
+      "mean_memory_consumed_percent": 2.53,
+      "mean_memory_allocated_percent": 6.17,
+      "containers_completed": 5823,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 6.81,
+        "p99_s": 7.84
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 430,
+        "mean_s": 17.94,
+        "p99_s": 37.53
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 843,
+        "mean_s": 21.12,
+        "p99_s": 51.24
+      }
+    }
+  }
+}

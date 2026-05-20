@@ -1,0 +1,179 @@
+{
+  "trace": "scenarios\\traces\\v2\\batch-heavy_bursty_memory-bound_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 45.519832429768364,
+      "failures": 4,
+      "suspensions": 0,
+      "assignments": 4015,
+      "failure_error_counts": {
+        "OOM": 4
+      },
+      "oom_count": 4,
+      "mean_memory_consumed_percent": 33.0,
+      "mean_memory_allocated_percent": 64.9,
+      "containers_completed": 4003,
+      "query": {
+        "arrived": 53,
+        "completed": 53,
+        "mean_s": 7.28,
+        "p99_s": 10.49
+      },
+      "interactive": {
+        "arrived": 151,
+        "completed": 151,
+        "mean_s": 30.68,
+        "p99_s": 103.87
+      },
+      "batch": {
+        "arrived": 744,
+        "completed": 718,
+        "mean_s": 64.93,
+        "p99_s": 137.08
+      }
+    },
+    "2": {
+      "ok": true,
+      "latency": 24.850961064563826,
+      "failures": 4,
+      "suspensions": 0,
+      "assignments": 4070,
+      "failure_error_counts": {
+        "OOM": 4
+      },
+      "oom_count": 4,
+      "mean_memory_consumed_percent": 16.68,
+      "mean_memory_allocated_percent": 33.1,
+      "containers_completed": 4063,
+      "query": {
+        "arrived": 53,
+        "completed": 53,
+        "mean_s": 7.11,
+        "p99_s": 10.49
+      },
+      "interactive": {
+        "arrived": 151,
+        "completed": 151,
+        "mean_s": 22.6,
+        "p99_s": 67.93
+      },
+      "batch": {
+        "arrived": 744,
+        "completed": 741,
+        "mean_s": 37.02,
+        "p99_s": 87.72
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 19.97129620502711,
+      "failures": 4,
+      "suspensions": 0,
+      "assignments": 4066,
+      "failure_error_counts": {
+        "OOM": 4
+      },
+      "oom_count": 4,
+      "mean_memory_consumed_percent": 8.26,
+      "mean_memory_allocated_percent": 16.62,
+      "containers_completed": 4062,
+      "query": {
+        "arrived": 53,
+        "completed": 53,
+        "mean_s": 6.93,
+        "p99_s": 10.49
+      },
+      "interactive": {
+        "arrived": 151,
+        "completed": 151,
+        "mean_s": 20.98,
+        "p99_s": 65.44
+      },
+      "batch": {
+        "arrived": 744,
+        "completed": 742,
+        "mean_s": 26.37,
+        "p99_s": 94.59
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 20.23591917200591,
+      "failures": 4,
+      "suspensions": 0,
+      "assignments": 4061,
+      "failure_error_counts": {
+        "OOM": 4
+      },
+      "oom_count": 4,
+      "mean_memory_consumed_percent": 4.13,
+      "mean_memory_allocated_percent": 8.29,
+      "containers_completed": 4057,
+      "query": {
+        "arrived": 53,
+        "completed": 53,
+        "mean_s": 6.81,
+        "p99_s": 8.5
+      },
+      "interactive": {
+        "arrived": 151,
+        "completed": 151,
+        "mean_s": 21.39,
+        "p99_s": 98.48
+      },
+      "batch": {
+        "arrived": 744,
+        "completed": 740,
+        "mean_s": 24.89,
+        "p99_s": 84.3
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 20.23591917200591,
+      "failures": 4,
+      "suspensions": 0,
+      "assignments": 4061,
+      "failure_error_counts": {
+        "OOM": 4
+      },
+      "oom_count": 4,
+      "mean_memory_consumed_percent": 2.06,
+      "mean_memory_allocated_percent": 4.14,
+      "containers_completed": 4057,
+      "query": {
+        "arrived": 53,
+        "completed": 53,
+        "mean_s": 6.81,
+        "p99_s": 8.5
+      },
+      "interactive": {
+        "arrived": 151,
+        "completed": 151,
+        "mean_s": 21.39,
+        "p99_s": 98.48
+      },
+      "batch": {
+        "arrived": 744,
+        "completed": 740,
+        "mean_s": 24.89,
+        "p99_s": 84.3
+      }
+    }
+  }
+}

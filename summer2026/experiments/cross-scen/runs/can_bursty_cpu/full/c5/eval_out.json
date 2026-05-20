@@ -1,0 +1,151 @@
+{
+  "trace": "scenarios\\traces\\v2\\canonical_bursty_cpu-bound_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 35.702413448735015,
+      "failures": 3430,
+      "suspensions": 0,
+      "assignments": 7280,
+      "failure_error_counts": {
+        "OOM": 3430
+      },
+      "oom_count": 3430,
+      "mean_memory_consumed_percent": 26.48,
+      "mean_memory_allocated_percent": 58.52,
+      "containers_completed": 3842,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 9.36,
+        "p99_s": 16.91
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 33.32,
+        "p99_s": 72.67
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 550,
+        "mean_s": 61.66,
+        "p99_s": 115.3
+      }
+    },
+    "2": {
+      "ok": false,
+      "error": "Overallocated RAM in assignment"
+    },
+    "4": {
+      "ok": true,
+      "latency": 16.98635486018642,
+      "failures": 3054,
+      "suspensions": 0,
+      "assignments": 6991,
+      "failure_error_counts": {
+        "OOM": 3054
+      },
+      "oom_count": 3054,
+      "mean_memory_consumed_percent": 5.83,
+      "mean_memory_allocated_percent": 12.61,
+      "containers_completed": 3936,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 8.53,
+        "p99_s": 8.53
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 19.3,
+        "p99_s": 35.78
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 573,
+        "mean_s": 25.49,
+        "p99_s": 46.05
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 15.138119174434088,
+      "failures": 3227,
+      "suspensions": 0,
+      "assignments": 7164,
+      "failure_error_counts": {
+        "OOM": 3227
+      },
+      "oom_count": 3227,
+      "mean_memory_consumed_percent": 2.96,
+      "mean_memory_allocated_percent": 6.28,
+      "containers_completed": 3936,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 8.53,
+        "p99_s": 8.53
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 18.29,
+        "p99_s": 34.98
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 573,
+        "mean_s": 18.25,
+        "p99_s": 35.51
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 15.129690412782958,
+      "failures": 3230,
+      "suspensions": 0,
+      "assignments": 7167,
+      "failure_error_counts": {
+        "OOM": 3230
+      },
+      "oom_count": 3230,
+      "mean_memory_consumed_percent": 1.48,
+      "mean_memory_allocated_percent": 3.14,
+      "containers_completed": 3936,
+      "query": {
+        "arrived": 104,
+        "completed": 104,
+        "mean_s": 8.53,
+        "p99_s": 8.53
+      },
+      "interactive": {
+        "arrived": 278,
+        "completed": 278,
+        "mean_s": 18.29,
+        "p99_s": 34.98
+      },
+      "batch": {
+        "arrived": 574,
+        "completed": 573,
+        "mean_s": 18.22,
+        "p99_s": 35.51
+      }
+    }
+  }
+}

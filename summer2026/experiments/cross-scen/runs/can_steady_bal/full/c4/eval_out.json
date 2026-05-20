@@ -1,0 +1,184 @@
+{
+  "trace": "scenarios\\traces\\v2\\canonical_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 168.95971447691278,
+      "failures": 3332,
+      "suspensions": 0,
+      "assignments": 5401,
+      "failure_error_counts": {
+        "OOM": 2906,
+        "timeout": 426
+      },
+      "oom_count": 2906,
+      "mean_memory_consumed_percent": 29.19,
+      "mean_memory_allocated_percent": 53.05,
+      "containers_completed": 2063,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 8.33,
+        "p99_s": 8.89
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 427,
+        "mean_s": 52.95,
+        "p99_s": 103.05
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "2": {
+      "ok": true,
+      "latency": 157.68899174659825,
+      "failures": 3351,
+      "suspensions": 0,
+      "assignments": 5426,
+      "failure_error_counts": {
+        "OOM": 2864,
+        "timeout": 487
+      },
+      "oom_count": 2864,
+      "mean_memory_consumed_percent": 10.11,
+      "mean_memory_allocated_percent": 19.23,
+      "containers_completed": 2071,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 8.31,
+        "p99_s": 8.31
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 32.51,
+        "p99_s": 58.97
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 154.86082980147222,
+      "failures": 3345,
+      "suspensions": 0,
+      "assignments": 5422,
+      "failure_error_counts": {
+        "OOM": 2862,
+        "timeout": 483
+      },
+      "oom_count": 2862,
+      "mean_memory_consumed_percent": 4.37,
+      "mean_memory_allocated_percent": 8.52,
+      "containers_completed": 2073,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 8.31,
+        "p99_s": 8.31
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 26.6,
+        "p99_s": 48.03
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 154.647579745706,
+      "failures": 3345,
+      "suspensions": 0,
+      "assignments": 5422,
+      "failure_error_counts": {
+        "OOM": 2869,
+        "timeout": 476
+      },
+      "oom_count": 2869,
+      "mean_memory_consumed_percent": 2.17,
+      "mean_memory_allocated_percent": 4.22,
+      "containers_completed": 2073,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 8.31,
+        "p99_s": 8.31
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 26.16,
+        "p99_s": 47.84
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 154.647579745706,
+      "failures": 3345,
+      "suspensions": 0,
+      "assignments": 5422,
+      "failure_error_counts": {
+        "OOM": 2869,
+        "timeout": 476
+      },
+      "oom_count": 2869,
+      "mean_memory_consumed_percent": 1.08,
+      "mean_memory_allocated_percent": 2.11,
+      "containers_completed": 2073,
+      "query": {
+        "arrived": 147,
+        "completed": 147,
+        "mean_s": 8.31,
+        "p99_s": 8.31
+      },
+      "interactive": {
+        "arrived": 433,
+        "completed": 429,
+        "mean_s": 26.16,
+        "p99_s": 47.84
+      },
+      "batch": {
+        "arrived": 848,
+        "completed": 0,
+        "mean_s": null,
+        "p99_s": null
+      }
+    }
+  }
+}

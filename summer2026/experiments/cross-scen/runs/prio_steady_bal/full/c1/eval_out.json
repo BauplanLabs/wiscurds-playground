@@ -1,0 +1,179 @@
+{
+  "trace": "scenarios\\traces\\v2\\priority-heavy_steady_balanced_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": true,
+      "latency": 13.89187647807895,
+      "failures": 1702,
+      "suspensions": 0,
+      "assignments": 5062,
+      "failure_error_counts": {
+        "OOM": 1702
+      },
+      "oom_count": 1702,
+      "mean_memory_consumed_percent": 30.44,
+      "mean_memory_allocated_percent": 62.48,
+      "containers_completed": 3350,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 8.07,
+        "p99_s": 9.89
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 419,
+        "mean_s": 19.66,
+        "p99_s": 39.46
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 27.86,
+        "p99_s": 51.54
+      }
+    },
+    "2": {
+      "ok": true,
+      "latency": 13.083034382390395,
+      "failures": 1708,
+      "suspensions": 0,
+      "assignments": 5070,
+      "failure_error_counts": {
+        "OOM": 1708
+      },
+      "oom_count": 1708,
+      "mean_memory_consumed_percent": 14.38,
+      "mean_memory_allocated_percent": 28.49,
+      "containers_completed": 3351,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 7.99,
+        "p99_s": 9.36
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 17.95,
+        "p99_s": 36.48
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 19.77,
+        "p99_s": 38.4
+      }
+    },
+    "4": {
+      "ok": true,
+      "latency": 13.012073858468254,
+      "failures": 1708,
+      "suspensions": 0,
+      "assignments": 5072,
+      "failure_error_counts": {
+        "OOM": 1708
+      },
+      "oom_count": 1708,
+      "mean_memory_consumed_percent": 7.18,
+      "mean_memory_allocated_percent": 14.25,
+      "containers_completed": 3351,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 7.95,
+        "p99_s": 7.95
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 17.76,
+        "p99_s": 36.48
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 19.5,
+        "p99_s": 38.08
+      }
+    },
+    "8": {
+      "ok": true,
+      "latency": 12.988186283427323,
+      "failures": 1708,
+      "suspensions": 0,
+      "assignments": 5072,
+      "failure_error_counts": {
+        "OOM": 1708
+      },
+      "oom_count": 1708,
+      "mean_memory_consumed_percent": 3.58,
+      "mean_memory_allocated_percent": 7.07,
+      "containers_completed": 3354,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 7.95,
+        "p99_s": 7.95
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 17.66,
+        "p99_s": 36.44
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 19.16,
+        "p99_s": 38.0
+      }
+    },
+    "16": {
+      "ok": true,
+      "latency": 12.988186283427323,
+      "failures": 1708,
+      "suspensions": 0,
+      "assignments": 5072,
+      "failure_error_counts": {
+        "OOM": 1708
+      },
+      "oom_count": 1708,
+      "mean_memory_consumed_percent": 1.79,
+      "mean_memory_allocated_percent": 3.54,
+      "containers_completed": 3354,
+      "query": {
+        "arrived": 874,
+        "completed": 871,
+        "mean_s": 7.95,
+        "p99_s": 7.95
+      },
+      "interactive": {
+        "arrived": 423,
+        "completed": 420,
+        "mean_s": 17.66,
+        "p99_s": 36.44
+      },
+      "batch": {
+        "arrived": 139,
+        "completed": 137,
+        "mean_s": 19.16,
+        "p99_s": 38.0
+      }
+    }
+  }
+}

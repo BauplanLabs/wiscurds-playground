@@ -1,0 +1,96 @@
+{
+  "trace": "scenarios\\traces\\v1\\bench_canonical_train.csv",
+  "scales": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "base_params": {
+    "cpus_per_pool": 64,
+    "ram_gb_per_pool": 500,
+    "duration": 3600,
+    "ticks_per_second": 100,
+    "max_job_seconds": 360
+  },
+  "scale_results": {
+    "1": {
+      "ok": false,
+      "error": "Overallocated CPU in assignment"
+    },
+    "2": {
+      "ok": false,
+      "error": "Overallocated RAM in assignment"
+    },
+    "4": {
+      "ok": true,
+      "latency": 141.21744481912935,
+      "failures": 23252,
+      "suspensions": 0,
+      "assignments": 41015,
+      "failure_error_counts": {
+        "OOM": 13862,
+        "timeout": 9390
+      },
+      "oom_count": 13862,
+      "mean_memory_consumed_percent": 45.27,
+      "mean_memory_allocated_percent": 95.63,
+      "containers_completed": 17726,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 6.95,
+        "p99_s": 8.56
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 1256,
+        "mean_s": 36.72,
+        "p99_s": 74.08
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 444,
+        "mean_s": 249.0,
+        "p99_s": 359.12
+      }
+    },
+    "8": {
+      "ok": false,
+      "error": "Overallocated RAM in assignment"
+    },
+    "16": {
+      "ok": true,
+      "latency": 27.228410484365423,
+      "failures": 6687,
+      "suspensions": 0,
+      "assignments": 34643,
+      "failure_error_counts": {
+        "OOM": 6687
+      },
+      "oom_count": 6687,
+      "mean_memory_consumed_percent": 15.06,
+      "mean_memory_allocated_percent": 32.56,
+      "containers_completed": 27914,
+      "query": {
+        "arrived": 430,
+        "completed": 428,
+        "mean_s": 6.77,
+        "p99_s": 8.3
+      },
+      "interactive": {
+        "arrived": 1267,
+        "completed": 1258,
+        "mean_s": 27.55,
+        "p99_s": 59.15
+      },
+      "batch": {
+        "arrived": 2413,
+        "completed": 2387,
+        "mean_s": 36.65,
+        "p99_s": 79.45
+      }
+    }
+  }
+}
