@@ -1,0 +1,377 @@
+@register_scheduler_init(key="scheduler_high_045")
+def scheduler_high_045_init(s):
+    # Simulator tick counter
+    s.ticks = 0
+
+    # Priority queues implemented as (items list, head index) to avoid O(n) pop(0)
+    s.q = {
+        Priority.QUERY: {"items": [], "head": 0},
+        Priority.INTERACTIVE: {"items": [], "head": 0},
+        Priority.BATCH_PIPELINE: {"items": [], "head": 0},
+    }
+
+    # Pipeline bookkeeping
+    s.enqueued = set()
+    s.dead_pipelines = set()
+    # pipeline_id -> {"enqueued_tick": int, "cooldown_until": int}
+    s.pipeline_meta = {}
+
+    # Operator bookkeeping (keyed by op object identity)
+    s.op_to_pipeline = {}   # op_key -> pipeline_id
+    s.op_last_alloc = {}    # op_key -> (cpu, ram)
+
+    # Learned lower-bounds from failures
+    s.op_ram_lb = {}        # op_key -> ram lower bound
+    s.op_cpu_lb = {}        # op_key -> cpu lower bound
+
+    # Failure counters (bounded retries)
+    s.op_fail_oom = {}      # op_key -> count
+    s.op_fail_timeout = {}  # op_key -> count
+    s.op_fail_other = {}    # op_key -> count
+    s.op_fail_total = {}    # op_key -> count
+
+    # Scheduling knobs (keep per-tick work bounded)
+    s.max_assignments_per_tick = 32
+    s.scan_limit_per_pick = 8
+
+    # Cooldowns to avoid repeatedly probing blocked pipelines every tick
+    s.cooldown_blocked_ticks = 8   # no runnable ops (likely running/assigned)
+    s.cooldown_nofit_ticks = 20    # runnable op exists, but doesn't fit anywhere now
+
+    # Retry limits (per operator)
+    s.max_oom_retries = 5
+    s.max_timeout_retries = 4
+    s.max_total_retries = 8
+
+    # Weighted RR pattern to avoid starving INTERACTIVE while protecting QUERY
+    s.pattern = [
+        Priority.QUERY,
+        Priority.QUERY,
+        Priority.INTERACTIVE,
+        Priority.INTERACTIVE,
+        Priority.INTERACTIVE,
+        Priority.BATCH_PIPELINE,
+    ]
+    s.rr_idx = 0
+
+
+@register_scheduler(key="scheduler_high_045")
+def scheduler_high_045(s, results, pipelines):
+    s.ticks += 1
+
+    def _op_key(op):
+        # Use object identity to avoid cross-pipeline id collisions.
+        return id(op)
+
+    def _err_str(err):
+        try:
+            return str(err).lower()
+        except Exception:
+            return ""
+
+    def _is_oom_error(err):
+        msg = _err_str(err)
+        return ("oom" in msg) or ("out of memory" in msg) or ("memoryerror" in msg)
+
+    def _is_timeout_error(err):
+        msg = _err_str(err)
+        return ("timeout" in msg) or ("timed out" in msg) or ("time out" in msg)
+
+    def _q_for_priority(pri):
+        if pri == Priority.QUERY:
+            return s.q[Priority.QUERY]
+        if pri == Priority.INTERACTIVE:
+            return s.q[Priority.INTERACTIVE]
+        return s.q[Priority.BATCH_PIPELINE]
+
+    def _q_len(q):
+        n = len(q["items"]) - q["head"]
+        return n if n > 0 else 0
+
+    def _q_compact_if_needed(q):
+        h = q["head"]
+        if h > 2048 and h > (len(q["items"]) // 2):
+            q["items"] = q["items"][h:]
+            q["head"] = 0
+
+    def _q_pop_front(q):
+        if q["head"] >= len(q["items"]):
+            return None
+        p = q["items"][q["head"]]
+        q["head"] += 1
+        _q_compact_if_needed(q)
+        return p
+
+    def _q_push_back(q, p):
+        q["items"].append(p)
+
+    def _forget_pipeline(pid):
+        s.enqueued.discard(pid)
+        s.pipeline_meta.pop(pid, None)
+
+    def _base_cpu(pri):
+        # Fixed-size defaults (do NOT scale with cluster size); scales concurrency with bigger clusters.
+        if pri == Priority.QUERY:
+            return 16.0
+        if pri == Priority.INTERACTIVE:
+            return 12.0
+        return 4.0
+
+    def _base_ram(pri):
+        # Fixed-size defaults to avoid massive over-reservation; OOM feedback corrects upward quickly.
+        if pri == Priority.QUERY:
+            return 32.0
+        if pri == Priority.INTERACTIVE:
+            return 24.0
+        return 16.0
+
+    # --- Ingest new pipelines (pipelines is expected to be new arrivals only) ---
+    for p in pipelines:
+        pid = p.pipeline_id
+        if pid in s.dead_pipelines or pid in s.enqueued:
+            continue
+        q = _q_for_priority(p.priority)
+        _q_push_back(q, p)
+        s.enqueued.add(pid)
+        s.pipeline_meta[pid] = {"enqueued_tick": s.ticks, "cooldown_until": s.ticks}
+
+    # --- Process results: learn from failures; DO NOT blacklist on timeout ---
+    for r in results:
+        ops = getattr(r, "ops", None) or []
+        failed = False
+        try:
+            failed = r.failed()
+        except Exception:
+            failed = bool(getattr(r, "error", None))
+
+        err = getattr(r, "error", None)
+        is_oom = failed and _is_oom_error(err)
+        is_to = failed and (not is_oom) and _is_timeout_error(err)
+
+        for op in ops:
+            opk = _op_key(op)
+            pid = s.op_to_pipeline.get(opk, None)
+
+            # Update last allocation snapshot (prefer result fields when present)
+            cpu_alloc = getattr(r, "cpu", None)
+            ram_alloc = getattr(r, "ram", None)
+            if cpu_alloc is None or ram_alloc is None:
+                last = s.op_last_alloc.get(opk, None)
+                if last is not None:
+                    if cpu_alloc is None:
+                        cpu_alloc = last[0]
+                    if ram_alloc is None:
+                        ram_alloc = last[1]
+            if cpu_alloc is not None and ram_alloc is not None:
+                s.op_last_alloc[opk] = (cpu_alloc, ram_alloc)
+
+            # Once we have a result for an op, we can forget its op->pipeline mapping.
+            # (Keeps memory bounded; retries will re-add mapping at next assignment.)
+            if opk in s.op_to_pipeline:
+                del s.op_to_pipeline[opk]
+
+            if not failed:
+                continue
+
+            s.op_fail_total[opk] = s.op_fail_total.get(opk, 0) + 1
+
+            if is_oom:
+                s.op_fail_oom[opk] = s.op_fail_oom.get(opk, 0) + 1
+                # Raise RAM lower-bound aggressively to converge quickly.
+                prev_lb = s.op_ram_lb.get(opk, 0.0)
+                base = ram_alloc if (ram_alloc is not None and ram_alloc > 0) else prev_lb
+                new_lb = base * 2.0 if base > 0 else 1.0
+                if new_lb < prev_lb:
+                    new_lb = prev_lb
+                s.op_ram_lb[opk] = new_lb
+            elif is_to:
+                s.op_fail_timeout[opk] = s.op_fail_timeout.get(opk, 0) + 1
+                # Raise CPU lower-bound to mitigate slow execution/timeouts.
+                prev_lb = s.op_cpu_lb.get(opk, 0.0)
+                base = cpu_alloc if (cpu_alloc is not None and cpu_alloc > 0) else prev_lb
+                new_lb = base * 2.0 if base > 0 else 1.0
+                if new_lb < prev_lb:
+                    new_lb = prev_lb
+                s.op_cpu_lb[opk] = new_lb
+            else:
+                s.op_fail_other[opk] = s.op_fail_other.get(opk, 0) + 1
+
+            # If this op has exceeded bounded retries, mark its pipeline dead (if known).
+            if pid is not None:
+                oom_n = s.op_fail_oom.get(opk, 0)
+                to_n = s.op_fail_timeout.get(opk, 0)
+                tot_n = s.op_fail_total.get(opk, 0)
+                if (oom_n > s.max_oom_retries) or (to_n > s.max_timeout_retries) or (tot_n > s.max_total_retries):
+                    s.dead_pipelines.add(pid)
+                    _forget_pipeline(pid)
+
+    suspensions = []
+    assignments = []
+
+    # Snapshot pool availability; MUST use local counters for this tick.
+    num_pools = s.executor.num_pools
+    local_cpu = [s.executor.pools[i].avail_cpu_pool for i in range(num_pools)]
+    local_ram = [s.executor.pools[i].avail_ram_pool for i in range(num_pools)]
+
+    # Quick global headroom check
+    def _any_headroom():
+        for i in range(num_pools):
+            if local_cpu[i] >= 1 and local_ram[i] >= 1:
+                return True
+        return False
+
+    scheduled_pipelines = set()
+
+    def _pick_and_place_one(pri):
+        q = _q_for_priority(pri)
+        if _q_len(q) == 0:
+            return False
+
+        scans = 0
+        while scans < s.scan_limit_per_pick:
+            scans += 1
+            p = _q_pop_front(q)
+            if p is None:
+                return False
+
+            pid = p.pipeline_id
+
+            if pid in s.dead_pipelines:
+                _forget_pipeline(pid)
+                continue
+
+            if pid in scheduled_pipelines:
+                _q_push_back(q, p)
+                continue
+
+            meta = s.pipeline_meta.get(pid)
+            if meta is not None and meta.get("cooldown_until", 0) > s.ticks:
+                _q_push_back(q, p)
+                continue
+
+            status = p.runtime_status()
+            if status.is_pipeline_successful():
+                _forget_pipeline(pid)
+                continue
+
+            ops = status.get_ops(ASSIGNABLE_STATES, require_parents_complete=True)
+            if not ops:
+                if meta is None:
+                    meta = {"enqueued_tick": s.ticks, "cooldown_until": s.ticks}
+                    s.pipeline_meta[pid] = meta
+                meta["cooldown_until"] = s.ticks + s.cooldown_blocked_ticks
+                _q_push_back(q, p)
+                continue
+
+            op = ops[0]
+            opk = _op_key(op)
+
+            # Retry bounds: if exceeded, kill the pipeline early to avoid churn.
+            oom_n = s.op_fail_oom.get(opk, 0)
+            to_n = s.op_fail_timeout.get(opk, 0)
+            tot_n = s.op_fail_total.get(opk, 0)
+            if (oom_n > s.max_oom_retries) or (to_n > s.max_timeout_retries) or (tot_n > s.max_total_retries):
+                s.dead_pipelines.add(pid)
+                _forget_pipeline(pid)
+                continue
+
+            # Target allocation (pool-independent); pool feasibility checked below.
+            cpu_target = _base_cpu(pri)
+            ram_target = _base_ram(pri)
+
+            cpu_lb = s.op_cpu_lb.get(opk, 0.0)
+            ram_lb = s.op_ram_lb.get(opk, 0.0)
+            if cpu_lb > cpu_target:
+                cpu_target = cpu_lb
+            if ram_lb > ram_target:
+                ram_target = ram_lb
+
+            if cpu_target < 1.0:
+                cpu_target = 1.0
+            if ram_target < 1.0:
+                ram_target = 1.0
+
+            # Choose a pool where it fits (respecting pool max and current availability).
+            best_pool = None
+            best_score = None
+            best_cpu = None
+            best_ram = None
+
+            for pool_id in range(num_pools):
+                pool = s.executor.pools[pool_id]
+
+                # If lower-bounds exceed pool max, this pool is infeasible.
+                if cpu_lb and cpu_lb > pool.max_cpu_pool:
+                    continue
+                if ram_lb and ram_lb > pool.max_ram_pool:
+                    continue
+
+                cpu_req = cpu_target if cpu_target <= pool.max_cpu_pool else pool.max_cpu_pool
+                ram_req = ram_target if ram_target <= pool.max_ram_pool else pool.max_ram_pool
+
+                if cpu_req > local_cpu[pool_id] or ram_req > local_ram[pool_id]:
+                    continue
+
+                # Prefer placing on pools with more headroom to reduce no-fit churn.
+                score = local_cpu[pool_id] + 0.001 * local_ram[pool_id]
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_pool = pool_id
+                    best_cpu = cpu_req
+                    best_ram = ram_req
+
+            if best_pool is None:
+                # Runnable op exists but doesn't fit anywhere right now; cooldown briefly.
+                if meta is None:
+                    meta = {"enqueued_tick": s.ticks, "cooldown_until": s.ticks}
+                    s.pipeline_meta[pid] = meta
+                meta["cooldown_until"] = s.ticks + s.cooldown_nofit_ticks
+                _q_push_back(q, p)
+                continue
+
+            # Place it.
+            assignments.append(
+                Assignment(
+                    ops=[op],
+                    cpu=best_cpu,
+                    ram=best_ram,
+                    priority=p.priority,
+                    pool_id=best_pool,
+                    pipeline_id=pid,
+                )
+            )
+            local_cpu[best_pool] -= best_cpu
+            local_ram[best_pool] -= best_ram
+
+            s.op_to_pipeline[opk] = pid
+            s.op_last_alloc[opk] = (best_cpu, best_ram)
+
+            scheduled_pipelines.add(pid)
+            _q_push_back(q, p)
+            return True
+
+        return False
+
+    # --- Main scheduling: bounded number of new assignments per tick ---
+    if _any_headroom():
+        pat = s.pattern
+        pat_len = len(pat)
+        for _ in range(s.max_assignments_per_tick):
+            if not _any_headroom():
+                break
+
+            placed = False
+            # Try a few priorities starting from rr pointer to avoid wasting slots.
+            for j in range(pat_len):
+                pri = pat[(s.rr_idx + j) % pat_len]
+                if _q_len(_q_for_priority(pri)) == 0:
+                    continue
+                if _pick_and_place_one(pri):
+                    s.rr_idx = (s.rr_idx + j + 1) % pat_len
+                    placed = True
+                    break
+
+            if not placed:
+                break
+
+    return suspensions, assignments

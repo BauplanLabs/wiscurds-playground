@@ -1,0 +1,104 @@
+[
+  {
+    "name": "scale_trend",
+    "args": {},
+    "result": "**scale_trend()** — all scales\n scale  status     latency   OOMs     Q%     I%     B%\n   1x    OK        465.30s      0   100%     0%    24%\n   2x    OK        465.22s      0   100%     0%    24%\n   4x    OK        464.57s      0   100%     0%    25%\n   8x    OK        464.41s      0   100%     0%    25%\n  16x    OK        464.51s      0   100%     0%    25%"
+  },
+  {
+    "name": "priority_breakdown",
+    "args": {
+      "scale": 1
+    },
+    "result": "**priority_breakdown(1x)** — score 465.297s\n- QUERY (x10): 147/147 completed (100%), mean 8.01s, p99 9.98s\n- INTERACTIVE (x5): 0/433 completed (0%), mean N/As, p99 N/As\n- BATCH (x1): 202/848 completed (24%), mean 248.66s, p99 359.02s"
+  },
+  {
+    "name": "priority_breakdown",
+    "args": {
+      "scale": 4
+    },
+    "result": "**priority_breakdown(4x)** — score 464.568s\n- QUERY (x10): 147/147 completed (100%), mean 7.95s, p99 10.75s\n- INTERACTIVE (x5): 0/433 completed (0%), mean N/As, p99 N/As\n- BATCH (x1): 208/848 completed (25%), mean 246.97s, p99 357.07s"
+  },
+  {
+    "name": "priority_breakdown",
+    "args": {
+      "scale": 16
+    },
+    "result": "**priority_breakdown(16x)** — score 464.515s\n- QUERY (x10): 147/147 completed (100%), mean 8.00s, p99 10.65s\n- INTERACTIVE (x5): 0/433 completed (0%), mean N/As, p99 N/As\n- BATCH (x1): 209/848 completed (25%), mean 247.76s, p99 358.46s"
+  },
+  {
+    "name": "failure_counts",
+    "args": {
+      "scale": 1
+    },
+    "result": "**failure_counts(1x)**\n- Scale status: OK\n- Operator failures: 555\n- timeout: 555"
+  },
+  {
+    "name": "failure_counts",
+    "args": {
+      "scale": 16
+    },
+    "result": "**failure_counts(16x)**\n- Scale status: OK\n- Operator failures: 545\n- timeout: 545"
+  },
+  {
+    "name": "failure_modes",
+    "args": {
+      "scale": 1
+    },
+    "result": "**failure_modes(1x)** — OK\n- Operator failures:  555\n- Suspensions:        0\n- Assignments made:   3009\n- Containers completed: 2451\n- Failure types:\n    timeout: 555"
+  },
+  {
+    "name": "failure_modes",
+    "args": {
+      "scale": 16
+    },
+    "result": "**failure_modes(16x)** — OK\n- Operator failures:  545\n- Suspensions:        0\n- Assignments made:   3018\n- Containers completed: 2470\n- Failure types:\n    timeout: 545"
+  },
+  {
+    "name": "memory_pressure",
+    "args": {
+      "scale": 1
+    },
+    "result": "**memory_pressure(1x)** — OK\n- Mean memory consumed (actual):   17.72%\n- Mean memory allocated (reserved): 63.88%\n- Allocated-minus-consumed gap: 46.2%"
+  },
+  {
+    "name": "memory_pressure",
+    "args": {
+      "scale": 16
+    },
+    "result": "**memory_pressure(16x)** — OK\n- Mean memory consumed (actual):   1.11%\n- Mean memory allocated (reserved): 63.89%\n- Allocated-minus-consumed gap: 62.8%"
+  },
+  {
+    "name": "throughput_counts",
+    "args": {
+      "scale": 1
+    },
+    "result": "**throughput_counts(1x)**\n- Assignments made: 3009\n- Containers completed: 2451\n- Suspensions: 0"
+  },
+  {
+    "name": "throughput_counts",
+    "args": {
+      "scale": 16
+    },
+    "result": "**throughput_counts(16x)**\n- Assignments made: 3018\n- Containers completed: 2470\n- Suspensions: 0"
+  },
+  {
+    "name": "workload_volume",
+    "args": {},
+    "result": "**workload_volume()**\n- Pipelines: 1428\n- Arrival window: 3588s"
+  },
+  {
+    "name": "priority_mix",
+    "args": {},
+    "result": "**priority_mix()**\n- QUERY: 147 (10%)\n- INTERACTIVE: 433 (30%)\n- BATCH_PIPELINE: 848 (59%)"
+  },
+  {
+    "name": "arrival_histogram",
+    "args": {},
+    "result": "**arrival_histogram() — pipelines per 5-min window**\n  t=    0s   124  ##############################\n  t=  300s   116  ##############################\n  t=  600s   124  ##############################\n  t=  900s   128  ##############################\n  t= 1200s   120  ##############################\n  t= 1500s   120  ##############################\n  t= 1800s   116  ##############################\n  t= 2100s   116  ##############################\n  t= 2400s   112  ##############################\n  t= 2700s   116  ##############################\n  t= 3000s   120  ##############################\n  t= 3300s   116  ##############################\n  mean/window: 119.0"
+  },
+  {
+    "name": "ops_per_pipeline_stats",
+    "args": {},
+    "result": "**ops_per_pipeline_stats()**\n- Median operators/pipeline: 4\n- P90 operators/pipeline: 6\n- Max operators/pipeline: 9"
+  }
+]
